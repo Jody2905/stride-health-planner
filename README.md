@@ -21,7 +21,7 @@ Safety rules are built into the engine: no weight-loss plan for under-18s, pregn
 | Layer | Tech |
 |---|---|
 | Health engine | Pure TypeScript package (`packages/engine`), Zod schema, Vitest |
-| API | Node + Express, SQLite (Node's built-in `node:sqlite`, nothing to compile), JWT sessions in httpOnly cookies |
+| API | Node + Express, PostgreSQL (Neon in production, PGlite locally: a real Postgres that runs inside Node, nothing to install), JWT sessions in httpOnly cookies |
 | Client | React 18 + Vite |
 | Tests | 24 engine unit tests, 16 API integration tests (Supertest) |
 
@@ -49,16 +49,28 @@ Production:
 
 ```bash
 npm run build
-NODE_ENV=production JWT_SECRET=$(openssl rand -hex 32) npm start   # http://localhost:3001
+NODE_ENV=production JWT_SECRET=$(openssl rand -hex 32) DATABASE_URL=postgres://... npm start   # http://localhost:3001
 ```
 
 | Env var | Default | Notes |
 |---|---|---|
 | `JWT_SECRET` | random in dev | **Required** in production, 32+ characters |
-| `DB_PATH` | `server/stride.db` | SQLite file location |
+| `DATABASE_URL` | none | Postgres connection string. **Required in production.** When unset (local dev), a built-in database is stored in `server/stride-data` |
+| `DB_PATH` | `server/stride-data` | Folder for the local built-in database |
+| `PG_POOL_MAX` | `5` | Max Postgres connections |
 | `PORT` | `3001` | |
 
 `npm run build:demo` produces `demo/index.html`, a single self-contained file of the client in guest-only mode (no backend), handy for a static demo.
+
+## Deploy for free (Render + Neon)
+
+The app runs as one web service: Express serves both the API and the built React app.
+
+1. **Database:** create a free project at [neon.com](https://neon.com) and copy its connection string (`postgresql://…?sslmode=require`). Tables are created automatically on first start.
+2. **Web service:** on [render.com](https://render.com), choose **New → Blueprint**, pick this repo, and paste the Neon connection string as `DATABASE_URL` when asked. `render.yaml` sets everything else (free plan, build and start commands, Node 22, a generated `JWT_SECRET`).
+3. Open the `onrender.com` URL. Free Render services sleep after 15 minutes without visitors and take about a minute to wake up; data is safe in Neon.
+
+GitHub Pages also hosts a guest-only build (see `.github/workflows/pages.yml`).
 
 ## API
 
@@ -104,7 +116,6 @@ All mutating requests must send `X-Requested-With: stride` and JSON.
 - Email verification and password reset
 - Food logging against the macro targets
 - Swap button for individual exercises and meals
-- Deploy: one service on Render / Railway / Fly.io with a persistent disk for the SQLite file
 
 ## Disclaimer
 

@@ -93,16 +93,16 @@ export function createApp(opts: AppOptions) {
 
   /* ---------------- statements ---------------- */
   const q = {
-    userByEmail: db.prepare<[string], { id: number; name: string; email: string; password_hash: string }>("SELECT * FROM users WHERE email = ?"),
+    userByEmail: db.prepare<[string], { id: number; name: string; email: string; password_hash: string }>("SELECT id, name, email, password_hash FROM users WHERE lower(email) = lower(?)"),
     userById: db.prepare<[number], { id: number; name: string; email: string; created_at: string }>("SELECT id, name, email, created_at FROM users WHERE id = ?"),
-    insertUser: db.prepare<[string, string, string, string]>("INSERT INTO users (name, email, password_hash, friend_code) VALUES (?, ?, ?, ?)"),
+    insertUser: db.prepare<[string, string, string, string], { id: number }>("INSERT INTO users (name, email, password_hash, friend_code) VALUES (?, ?, ?, ?) RETURNING id"),
     deleteUser: db.prepare("DELETE FROM users WHERE id = ?"),
-    profile: db.prepare<[number], { data: string; units: string; updated_at: string }>("SELECT data, units, updated_at FROM profiles WHERE user_id = ?"),
+    profile: db.prepare<[number], { data: unknown; units: string; updated_at: string }>("SELECT data, units, updated_at FROM profiles WHERE user_id = ?"),
     upsertProfile: db.prepare(
-      `INSERT INTO profiles (user_id, data, units) VALUES (?, ?, ?)
-       ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, units = excluded.units, updated_at = datetime('now')`,
+      `INSERT INTO profiles (user_id, data, units) VALUES (?, ?::jsonb, ?)
+       ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, units = excluded.units, updated_at = now()`,
     ),
-    weights: db.prepare<[number], { date: string; weightKg: number }>("SELECT date, weight_kg AS weightKg FROM weight_logs WHERE user_id = ? ORDER BY date"),
+    weights: db.prepare<[number], { date: string; weightKg: number }>("SELECT date, weight_kg AS \"weightKg\" FROM weight_logs WHERE user_id = ? ORDER BY date"),
     upsertWeight: db.prepare(
       `INSERT INTO weight_logs (user_id, date, weight_kg) VALUES (?, ?, ?)
        ON CONFLICT(user_id, date) DO UPDATE SET weight_kg = excluded.weight_kg`,
@@ -126,20 +126,20 @@ export function createApp(opts: AppOptions) {
     friendships: db.prepare<[number, number, number], { id: number; name: string; status: string; requester_id: number }>(
       `SELECT u.id, u.name, f.status, f.requester_id
          FROM friendships f
-         JOIN users u ON u.id = CASE WHEN f.requester_id = ?1 THEN f.addressee_id ELSE f.requester_id END
-        WHERE f.requester_id = ?2 OR f.addressee_id = ?3
+         JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
+        WHERE f.requester_id = ? OR f.addressee_id = ?
         ORDER BY u.name`,
     ),
     pair: db.prepare<[number, number, number, number], { requester_id: number; status: string }>(
       "SELECT requester_id, status FROM friendships WHERE (requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)",
     ),
-    pendingOut: db.prepare<[number], { n: number }>("SELECT COUNT(*) AS n FROM friendships WHERE requester_id = ? AND status = 'pending'"),
+    pendingOut: db.prepare<[number], { n: number }>("SELECT COUNT(*)::int AS n FROM friendships WHERE requester_id = ? AND status = 'pending'"),
     insertFriend: db.prepare("INSERT INTO friendships (requester_id, addressee_id, status) VALUES (?, ?, 'pending')"),
     acceptFriend: db.prepare("UPDATE friendships SET status = 'accepted' WHERE requester_id = ? AND addressee_id = ? AND status = 'pending'"),
     deleteFriend: db.prepare("DELETE FROM friendships WHERE (requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)"),
     // The signed-in user plus accepted friends, with their steps for the week. Nobody else's data can appear here.
     board: db.prepare<[string, string, number, number, number, number], { id: number; name: string; goal: number | null; date: string | null; steps: number | null }>(
-      `SELECT u.id, u.name, json_extract(p.data, '$.stepGoal') AS goal, s.date, s.steps
+      `SELECT u.id, u.name, (p.data->>'stepGoal')::int AS goal, s.date, s.steps
          FROM users u
          LEFT JOIN profiles p ON p.user_id = u.id
          LEFT JOIN step_logs s ON s.user_id = u.id AND s.date BETWEEN ? AND ?
@@ -150,21 +150,21 @@ export function createApp(opts: AppOptions) {
     ),
   };
 
-  function friendsOf(me: number) {
-    const rows = q.friendships.all(me, me, me);
+  async function friendsOf(me: number) {
+    const rows = await q.friendships.all(me, me, me);
     const pick = (f: (r: (typeof rows)[number]) => boolean) => rows.filter(f).map((r) => ({ id: r.id, name: r.name }));
     return {
-      code: q.myCode.get(me)?.friend_code ?? "",
+      code: (await q.myCode.get(me))?.friend_code ?? "",
       friends: pick((r) => r.status === "accepted"),
       incoming: pick((r) => r.status === "pending" && r.requester_id !== me),
       outgoing: pick((r) => r.status === "pending" && r.requester_id === me),
     };
   }
 
-  const getProfile = (userId: number) => {
-    const row = q.profile.get(userId);
+  const getProfile = async (userId: number) => {
+    const row = await q.profile.get(userId);
     if (!row) return null;
-    const parsed = ProfileSchema.safeParse(JSON.parse(row.data));
+    const parsed = ProfileSchema.safeParse(typeof row.data === "string" ? JSON.parse(row.data) : row.data);
     return parsed.success ? { profile: parsed.data, units: row.units as "metric" | "imperial", updatedAt: row.updated_at } : null;
   };
 
@@ -175,11 +175,11 @@ export function createApp(opts: AppOptions) {
     "/api/auth/register",
     h(async (req, res) => {
       const body = RegisterBody.parse(req.body);
-      if (q.userByEmail.get(body.email)) return res.status(409).json({ error: "An account with that email already exists. Sign in instead." });
-      const info = q.insertUser.run(body.name, body.email, await hashPassword(body.password), newFriendCode());
-      const id = Number(info.lastInsertRowid);
+      if (await q.userByEmail.get(body.email)) return res.status(409).json({ error: "An account with that email already exists. Sign in instead." });
+      const inserted = await q.insertUser.get(body.name, body.email, await hashPassword(body.password), newFriendCode());
+      const id = inserted!.id;
       auth.issue(res, id);
-      res.status(201).json({ user: q.userById.get(id) });
+      res.status(201).json({ user: await q.userById.get(id) });
     }),
   );
 
@@ -187,11 +187,11 @@ export function createApp(opts: AppOptions) {
     "/api/auth/login",
     h(async (req, res) => {
       const body = LoginBody.parse(req.body);
-      const user = q.userByEmail.get(body.email);
+      const user = await q.userByEmail.get(body.email);
       const ok = await checkPassword(body.password, user?.password_hash ?? DUMMY_HASH);
       if (!user || !ok) return res.status(401).json({ error: "Email or password is incorrect." });
       auth.issue(res, user.id);
-      res.json({ user: q.userById.get(user.id) });
+      res.json({ user: await q.userById.get(user.id) });
     }),
   );
 
@@ -203,21 +203,21 @@ export function createApp(opts: AppOptions) {
   app.get(
     "/api/auth/me",
     auth.requireUser,
-    h((req, res) => {
-      const user = q.userById.get(req.userId!);
+    h(async (req, res) => {
+      const user = await q.userById.get(req.userId!);
       if (!user) {
         auth.clear(res);
         return res.status(401).json({ error: "Sign in to continue." });
       }
-      res.json({ user, ...(getProfile(user.id) ?? { profile: null, units: "metric" }) });
+      res.json({ user, ...(await getProfile(user.id) ?? { profile: null, units: "metric" }) });
     }),
   );
 
   app.delete(
     "/api/account",
     auth.requireUser,
-    h((req, res) => {
-      q.deleteUser.run(req.userId!); // cascades to profile and logs
+    h(async (req, res) => {
+      await q.deleteUser.run(req.userId!); // cascades to profile and logs
       auth.clear(res);
       res.status(204).end();
     }),
@@ -226,8 +226,8 @@ export function createApp(opts: AppOptions) {
   app.get(
     "/api/profile",
     auth.requireUser,
-    h((req, res) => {
-      const p = getProfile(req.userId!);
+    h(async (req, res) => {
+      const p = await getProfile(req.userId!);
       if (!p) return res.status(404).json({ error: "No profile saved yet." });
       res.json(p);
     }),
@@ -236,115 +236,115 @@ export function createApp(opts: AppOptions) {
   app.put(
     "/api/profile",
     auth.requireUser,
-    h((req, res) => {
+    h(async (req, res) => {
       const body = ProfileBody.parse(req.body);
-      q.upsertProfile.run(req.userId!, JSON.stringify(body.profile), body.units);
-      res.json(getProfile(req.userId!));
+      await q.upsertProfile.run(req.userId!, JSON.stringify(body.profile), body.units);
+      res.json(await getProfile(req.userId!));
     }),
   );
 
   app.get(
     "/api/plan",
     auth.requireUser,
-    h((req, res) => {
-      const p = getProfile(req.userId!);
+    h(async (req, res) => {
+      const p = await getProfile(req.userId!);
       if (!p) return res.status(404).json({ error: "Save your profile first." });
       const variant = z.coerce.number().int().min(0).max(1000).catch(0).parse(req.query.variant);
       res.json(buildPlan(p.profile as Profile, { units: p.units, mealVariant: variant }));
     }),
   );
 
-  app.get("/api/weights", auth.requireUser, h((req, res) => res.json(q.weights.all(req.userId!))));
+  app.get("/api/weights", auth.requireUser, h(async (req, res) => res.json(await q.weights.all(req.userId!))));
   app.post(
     "/api/weights",
     auth.requireUser,
-    h((req, res) => {
+    h(async (req, res) => {
       const b = WeightBody.parse(req.body);
-      q.upsertWeight.run(req.userId!, b.date, b.weightKg);
-      res.status(201).json(q.weights.all(req.userId!));
+      await q.upsertWeight.run(req.userId!, b.date, b.weightKg);
+      res.status(201).json(await q.weights.all(req.userId!));
     }),
   );
   app.delete(
     "/api/weights/:date",
     auth.requireUser,
-    h((req, res) => {
-      q.deleteWeight.run(req.userId!, IsoDate.parse(req.params.date));
-      res.json(q.weights.all(req.userId!));
+    h(async (req, res) => {
+      await q.deleteWeight.run(req.userId!, IsoDate.parse(req.params.date));
+      res.json(await q.weights.all(req.userId!));
     }),
   );
 
-  app.get("/api/workouts", auth.requireUser, h((req, res) => res.json(q.workouts.all(req.userId!))));
+  app.get("/api/workouts", auth.requireUser, h(async (req, res) => res.json(await q.workouts.all(req.userId!))));
   app.post(
     "/api/workouts",
     auth.requireUser,
-    h((req, res) => {
+    h(async (req, res) => {
       const b = WorkoutBody.parse(req.body);
-      q.upsertWorkout.run(req.userId!, b.date, b.title);
-      res.status(201).json(q.workouts.all(req.userId!));
+      await q.upsertWorkout.run(req.userId!, b.date, b.title);
+      res.status(201).json(await q.workouts.all(req.userId!));
     }),
   );
   app.delete(
     "/api/workouts/:date",
     auth.requireUser,
-    h((req, res) => {
-      q.deleteWorkout.run(req.userId!, IsoDate.parse(req.params.date));
-      res.json(q.workouts.all(req.userId!));
+    h(async (req, res) => {
+      await q.deleteWorkout.run(req.userId!, IsoDate.parse(req.params.date));
+      res.json(await q.workouts.all(req.userId!));
     }),
   );
 
   /* ---------------- walking tracker ---------------- */
-  app.get("/api/steps", auth.requireUser, h((req, res) => res.json(q.steps.all(req.userId!))));
+  app.get("/api/steps", auth.requireUser, h(async (req, res) => res.json(await q.steps.all(req.userId!))));
   app.post(
     "/api/steps",
     auth.requireUser,
-    h((req, res) => {
+    h(async (req, res) => {
       const b = StepsBody.parse(req.body);
-      q.upsertSteps.run(req.userId!, b.date, b.steps);
-      res.status(201).json(q.steps.all(req.userId!));
+      await q.upsertSteps.run(req.userId!, b.date, b.steps);
+      res.status(201).json(await q.steps.all(req.userId!));
     }),
   );
   app.delete(
     "/api/steps/:date",
     auth.requireUser,
-    h((req, res) => {
-      q.deleteSteps.run(req.userId!, IsoDate.parse(req.params.date));
-      res.json(q.steps.all(req.userId!));
+    h(async (req, res) => {
+      await q.deleteSteps.run(req.userId!, IsoDate.parse(req.params.date));
+      res.json(await q.steps.all(req.userId!));
     }),
   );
 
-  app.get("/api/friends", auth.requireUser, h((req, res) => res.json(friendsOf(req.userId!))));
+  app.get("/api/friends", auth.requireUser, h(async (req, res) => res.json(await friendsOf(req.userId!))));
 
   app.post(
     "/api/friends",
     auth.requireUser,
-    h((req, res) => {
+    h(async (req, res) => {
       const me = req.userId!;
       const code = FriendCode.parse(req.body?.code);
-      const other = q.userByCode.get(code);
+      const other = await q.userByCode.get(code);
       if (!other) return res.status(404).json({ error: "No one has that friend code. Check it and try again." });
       if (other.id === me) return res.status(400).json({ error: "That's your own code. Share it with a friend instead." });
-      const existing = q.pair.get(me, other.id, other.id, me);
+      const existing = await q.pair.get(me, other.id, other.id, me);
       if (existing?.status === "accepted") return res.status(409).json({ error: `You and ${other.name} are already friends.` });
       if (existing && existing.requester_id === me) return res.status(409).json({ error: `You've already sent ${other.name} a request.` });
       if (existing) {
         // They already asked us: adding their code accepts it.
-        q.acceptFriend.run(other.id, me);
-        return res.json({ ...friendsOf(me), message: `You and ${other.name} are now friends.` });
+        await q.acceptFriend.run(other.id, me);
+        return res.json({ ...await friendsOf(me), message: `You and ${other.name} are now friends.` });
       }
-      if ((q.pendingOut.get(me)?.n ?? 0) >= MAX_PENDING)
+      if (((await q.pendingOut.get(me))?.n ?? 0) >= MAX_PENDING)
         return res.status(429).json({ error: "You have too many requests waiting. Wait for some to be accepted first." });
-      q.insertFriend.run(me, other.id);
-      res.status(201).json({ ...friendsOf(me), message: `Request sent to ${other.name}.` });
+      await q.insertFriend.run(me, other.id);
+      res.status(201).json({ ...await friendsOf(me), message: `Request sent to ${other.name}.` });
     }),
   );
 
   app.post(
     "/api/friends/:id/accept",
     auth.requireUser,
-    h((req, res) => {
-      const info = q.acceptFriend.run(UserIdParam.parse(req.params.id), req.userId!);
+    h(async (req, res) => {
+      const info = await q.acceptFriend.run(UserIdParam.parse(req.params.id), req.userId!);
       if (!Number(info.changes)) return res.status(404).json({ error: "That request no longer exists." });
-      res.json(friendsOf(req.userId!));
+      res.json(await friendsOf(req.userId!));
     }),
   );
 
@@ -352,11 +352,11 @@ export function createApp(opts: AppOptions) {
   app.delete(
     "/api/friends/:id",
     auth.requireUser,
-    h((req, res) => {
+    h(async (req, res) => {
       const me = req.userId!;
       const other = UserIdParam.parse(req.params.id);
-      q.deleteFriend.run(me, other, other, me);
-      res.json(friendsOf(me));
+      await q.deleteFriend.run(me, other, other, me);
+      res.json(await friendsOf(me));
     }),
   );
 
@@ -364,20 +364,20 @@ export function createApp(opts: AppOptions) {
   app.post(
     "/api/friends/code",
     auth.requireUser,
-    h((req, res) => {
-      q.setCode.run(newFriendCode(), req.userId!);
-      res.json(friendsOf(req.userId!));
+    h(async (req, res) => {
+      await q.setCode.run(newFriendCode(), req.userId!);
+      res.json(await friendsOf(req.userId!));
     }),
   );
 
   app.get(
     "/api/walking/leaderboard",
     auth.requireUser,
-    h((req, res) => {
+    h(async (req, res) => {
       const me = req.userId!;
       const week = IsoDate.parse(req.query.week);
       const dates = weekDates(week);
-      const rows = q.board.all(dates[0], dates[6], me, me, me, me);
+      const rows = await q.board.all(dates[0], dates[6], me, me, me, me);
       const people = new Map<number, { id: number; name: string; isMe: boolean; goal: number; daily: number[]; total: number }>();
       for (const r of rows) {
         const person = people.get(r.id) ?? { id: r.id, name: r.name, isMe: r.id === me, goal: r.goal ?? 8000, daily: Array(7).fill(0), total: 0 };
@@ -396,11 +396,11 @@ export function createApp(opts: AppOptions) {
   app.get(
     "/api/export",
     auth.requireUser,
-    h((req, res) => {
+    h(async (req, res) => {
       const id = req.userId!;
       res.setHeader("Content-Disposition", 'attachment; filename="stride-data.json"');
-      const { friends } = friendsOf(id);
-      res.json({ user: q.userById.get(id), ...getProfile(id), weights: q.weights.all(id), workouts: q.workouts.all(id), steps: q.steps.all(id), friends: friends.map((f) => f.name) });
+      const { friends } = await friendsOf(id);
+      res.json({ user: await q.userById.get(id), ...await getProfile(id), weights: await q.weights.all(id), workouts: await q.workouts.all(id), steps: await q.steps.all(id), friends: friends.map((f) => f.name) });
     }),
   );
 
@@ -419,6 +419,8 @@ export function createApp(opts: AppOptions) {
       return res.status(400).json({ error: first?.message ?? "Invalid input.", field: first?.path.join(".") });
     }
     if (err instanceof SyntaxError) return res.status(400).json({ error: "Request body isn't valid JSON." });
+    // Postgres unique violation: two requests raced to create the same email, friendship, etc.
+    if ((err as { code?: string }).code === "23505") return res.status(409).json({ error: "That already exists." });
     console.error(err);
     res.status(500).json({ error: "Something went wrong on our side. Try again." });
   });

@@ -7,8 +7,8 @@ import { openDb } from "../src/db";
 const H = { "X-Requested-With": "stride" };
 let app: ReturnType<typeof createApp>;
 
-beforeEach(() => {
-  app = createApp({ db: openDb(":memory:"), jwtSecret: "x".repeat(40), rateLimit: false });
+beforeEach(async () => {
+  app = createApp({ db: await openDb(":memory:"), jwtSecret: "x".repeat(40), rateLimit: false });
 });
 
 async function signedIn(email = "jo@example.com") {

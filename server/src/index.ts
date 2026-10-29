@@ -17,7 +17,14 @@ if (!secret || secret.length < 32) {
   console.warn("JWT_SECRET not set: using a random dev secret (sessions reset on restart).");
 }
 
-const db = openDb(process.env.DB_PATH ?? path.resolve(here, "../stride.db"));
+// Production needs a hosted Postgres: free hosts like Render wipe local files on restart.
+const databaseUrl = process.env.DATABASE_URL;
+if (isProd && !databaseUrl) {
+  console.error("DATABASE_URL must be set in production (a postgres:// connection string, e.g. from Neon).");
+  process.exit(1);
+}
+const db = await openDb(databaseUrl ?? process.env.DB_PATH ?? path.resolve(here, "../stride-data"));
+console.log(databaseUrl ? "Using hosted Postgres from DATABASE_URL." : "Using the local built-in database (PGlite).");
 const app = createApp({
   db,
   jwtSecret: secret,
