@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+export const INJURY_AREAS = ["knee", "back", "shoulder", "wrist", "hip", "ankle"] as const;
+export type InjuryArea = (typeof INJURY_AREAS)[number];
+export const INJURY_LABEL: Record<InjuryArea, string> = {
+  knee: "Knees",
+  back: "Lower back",
+  shoulder: "Shoulders",
+  wrist: "Wrists / elbows",
+  hip: "Hips",
+  ankle: "Ankles / feet",
+};
+
 /** Validation schema for a user's profile. Shared by the API (request validation) and the client (form). */
 export const ProfileSchema = z.object({
   sex: z.enum(["female", "male", "other"]),
@@ -20,6 +31,14 @@ export const ProfileSchema = z.object({
   glutenFree: z.boolean(),
   pregnant: z.boolean(),
   condition: z.boolean(),
+  /** Body areas with a current injury or long-term limitation. Exercises that load them are swapped out. */
+  injuries: z.array(z.enum(INJURY_AREAS)).max(INJURY_AREAS.length).default([]),
+  /** Prefer low-impact cardio (no running or jumping). */
+  lowImpact: z.boolean().default(false),
+  /** Exercises the user chose to swap out. */
+  avoidExercises: z.array(z.string().max(60)).max(60).default([]),
+  /** Daily step goal for the walking tracker. */
+  stepGoal: z.number().int().min(1000).max(30000).default(8000),
 });
 
 export type Profile = z.infer<typeof ProfileSchema>;
@@ -52,6 +71,10 @@ export const DEFAULT_PROFILE: Profile = {
   glutenFree: false,
   pregnant: false,
   condition: false,
+  injuries: [],
+  lowImpact: false,
+  avoidExercises: [],
+  stepGoal: 8000,
 };
 
 export const LB_PER_KG = 2.20462;

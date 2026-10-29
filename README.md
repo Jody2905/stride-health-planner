@@ -6,10 +6,13 @@ A full-stack TypeScript app that builds a personalised plan from a user's age, h
 
 - **Calorie, protein and water targets** (Mifflin-St Jeor BMR × activity factor, safe deficit/surplus with hard floors)
 - **Weekly workout plan** for 2–6 days, matched to experience level and equipment (none / dumbbells / gym), with how-to steps for every exercise
+- **Injury-aware training**: mark knees, lower back, shoulders, wrists, hips or ankles and exercises that load them are replaced with safer alternatives; swap out any exercise you don't want with one tap; low-impact cardio option
 - **Nutrition**: macro split, meal-by-meal targets in hand portions, sample days for omnivore / vegetarian / vegan diets, dairy-free and gluten-free filters, and a Caribbean food option
+- **Weekly meal plan & grocery list**: seven days of meals scaled to your calories, totalled into a shopping list grouped by aisle, with tick-off and copy
 - **Vitamins & supplements** graded Strong / Moderate / Limited / Avoid, filtered to the user's profile, each linked to its research source
 - **Daily health targets** (sleep, steps, fibre, sugar, salt) and screening reminders
 - **Progress tracking**: weight log with a trend chart against the goal, and workout check-offs
+- **Walking with friends**: daily step log against your goal, private friend codes, friend requests, and a weekly leaderboard that only accepted friends can see
 
 Safety rules are built into the engine: no weight-loss plan for under-18s, pregnancy/breastfeeding, or anyone already underweight; goals below a healthy BMI are raised to the bottom of the healthy range; calories never drop below 1,200 (female) / 1,500 (male).
 
@@ -20,10 +23,10 @@ Safety rules are built into the engine: no weight-loss plan for under-18s, pregn
 | Health engine | Pure TypeScript package (`packages/engine`), Zod schema, Vitest |
 | API | Node + Express, SQLite (Node's built-in `node:sqlite`, nothing to compile), JWT sessions in httpOnly cookies |
 | Client | React 18 + Vite |
-| Tests | 17 engine unit tests, 11 API integration tests (Supertest) |
+| Tests | 24 engine unit tests, 16 API integration tests (Supertest) |
 
 ```
-packages/engine   calculations, workouts, nutrition, supplements, habits (shared by API and client)
+packages/engine   calculations, workouts, nutrition, groceries, supplements, habits (shared by API and client)
 server            Express API + SQLite; also serves the built client in production
 client            React app (works as a guest with browser storage, or signed in)
 scripts           build helper for the single-file demo
@@ -73,6 +76,14 @@ All mutating requests must send `X-Requested-With: stride` and JSON.
 | DELETE | `/api/weights/:date` | |
 | GET / POST | `/api/workouts` | `{date, title}` |
 | DELETE | `/api/workouts/:date` | |
+| GET / POST | `/api/steps` | `{date, steps}`, one entry per date |
+| DELETE | `/api/steps/:date` | |
+| GET | `/api/friends` | Your friend code, friends, and incoming/outgoing requests |
+| POST | `/api/friends` | `{code}` sends a request (or accepts theirs if they already asked you) |
+| POST | `/api/friends/:id/accept` | |
+| DELETE | `/api/friends/:id` | Remove a friend, decline or cancel a request |
+| POST | `/api/friends/code` | Issue a new friend code |
+| GET | `/api/walking/leaderboard?week=YYYY-MM-DD` | You and your accepted friends' steps for the week starting that Monday |
 | GET | `/api/export` | Download all of the user's data as JSON |
 | DELETE | `/api/account` | Deletes the user and all their data |
 
@@ -84,6 +95,7 @@ All mutating requests must send `X-Requested-With: stride` and JSON.
 - Every input validated with Zod; all SQL uses prepared statements; JSON body capped at 20 KB
 - Helmet security headers with a strict Content-Security-Policy
 - Rate limits: 20 auth attempts per 15 min, 300 API requests per minute per IP
+- Friends are added by random, unguessable codes rather than email, so accounts can't be looked up; friends only ever see each other's name and step counts, and either side can remove the link
 - Users can export or permanently delete their data; signed-in data is never left in the browser's localStorage
 - The server refuses to start in production without a strong `JWT_SECRET`
 

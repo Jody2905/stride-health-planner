@@ -110,3 +110,80 @@ describe("progress logs", () => {
     expect((await agent.get("/api/workouts")).status).toBe(401);
   });
 });
+
+describe("walking with friends", () => {
+  const monday = (() => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
+  })();
+
+  async function codeOf(agent: Awaited<ReturnType<typeof signedIn>>) {
+    return (await agent.get("/api/friends")).body.code as string;
+  }
+
+  it("logs steps per day", async () => {
+    const jo = await signedIn();
+    await jo.post("/api/steps").set(H).send({ date: monday, steps: 6500 });
+    const r = await jo.post("/api/steps").set(H).send({ date: monday, steps: 9100 });
+    expect(r.body).toEqual([{ date: monday, steps: 9100 }]);
+    expect((await jo.post("/api/steps").set(H).send({ date: monday, steps: -5 })).status).toBe(400);
+  });
+
+  it("connects friends by code and shares only friends' steps", async () => {
+    const jo = await signedIn("jo@example.com");
+    const sam = await signedIn("sam@example.com");
+    const stranger = await signedIn("x@example.com");
+    const samCode = await codeOf(sam);
+    expect(samCode).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+
+    // lower-case and no dash still works
+    const sent = await jo.post("/api/friends").set(H).send({ code: samCode.toLowerCase().replace("-", "") });
+    expect(sent.status).toBe(201);
+    expect(sent.body.outgoing.map((f: { id: number }) => f.id)).toEqual([2]); // Sam's user id
+    expect((await jo.post("/api/friends").set(H).send({ code: samCode })).status).toBe(409);
+
+    const inbox = await sam.get("/api/friends");
+    expect(inbox.body.incoming).toHaveLength(1);
+    await sam.post(`/api/friends/${inbox.body.incoming[0].id}/accept`).set(H);
+
+    await sam.post("/api/steps").set(H).send({ date: monday, steps: 12000 });
+    await stranger.post("/api/steps").set(H).send({ date: monday, steps: 99999 });
+    await jo.post("/api/steps").set(H).send({ date: monday, steps: 5000 });
+
+    const board = await jo.get(`/api/walking/leaderboard?week=${monday}`);
+    expect(board.body.week).toHaveLength(7);
+    expect(board.body.members.map((m: { total: number }) => m.total)).toEqual([12000, 5000]);
+    expect(JSON.stringify(board.body)).not.toMatch(/99999|email/);
+
+    // removing ends sharing both ways
+    await jo.delete(`/api/friends/${board.body.members[0].id}`).set(H);
+    expect((await sam.get(`/api/walking/leaderboard?week=${monday}`)).body.members).toHaveLength(1);
+  });
+
+  it("rejects bad, unknown and own codes", async () => {
+    const jo = await signedIn();
+    expect((await jo.post("/api/friends").set(H).send({ code: "nope" })).status).toBe(400);
+    expect((await jo.post("/api/friends").set(H).send({ code: "AAAA-BBBB" })).status).toBe(404);
+    const own = await codeOf(jo);
+    expect((await jo.post("/api/friends").set(H).send({ code: own })).status).toBe(400);
+  });
+
+  it("adding someone who already asked you accepts their request", async () => {
+    const jo = await signedIn("jo@example.com");
+    const sam = await signedIn("sam@example.com");
+    const samCode = await codeOf(sam);
+    const joCode = await codeOf(jo);
+    await jo.post("/api/friends").set(H).send({ code: samCode });
+    const r = await sam.post("/api/friends").set(H).send({ code: joCode });
+    expect(r.status).toBe(200);
+    expect(r.body.friends).toHaveLength(1);
+  });
+
+  it("can reset the friend code", async () => {
+    const jo = await signedIn();
+    const before = await codeOf(jo);
+    const after = (await jo.post("/api/friends/code").set(H)).body.code;
+    expect(after).not.toBe(before);
+  });
+});

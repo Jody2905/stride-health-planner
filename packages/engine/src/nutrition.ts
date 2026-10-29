@@ -66,48 +66,50 @@ interface MealIdea {
   diets: Diet[];
   tags?: Tag[];
   caribbean?: boolean;
+  /** Ingredients for one serving at the reference size (about 500 kcal for meals, 200 kcal for snacks). */
+  ing: string;
 }
 
 const MEALS: MealIdea[] = [
   // Breakfast
-  { slot: "breakfast", name: "Greek yogurt with oats, berries and walnuts", diets: VEG, tags: ["dairy"] },
-  { slot: "breakfast", name: "Scrambled eggs on wholegrain toast with spinach and tomato", diets: VEG, tags: ["gluten"] },
-  { slot: "breakfast", name: "Tofu scramble with peppers, black beans and a corn tortilla", diets: ALL },
-  { slot: "breakfast", name: "Overnight oats with soy milk, chia, peanut butter and banana", diets: ALL },
-  { slot: "breakfast", name: "Veggie omelette with avocado and a piece of fruit", diets: VEG },
-  { slot: "breakfast", name: "Saltfish and callaloo with roasted breadfruit", diets: MEAT, tags: ["fish"], caribbean: true },
-  { slot: "breakfast", name: "Cornmeal porridge made with milk or soy milk, topped with banana and nutmeg", diets: ALL, caribbean: true },
-  { slot: "breakfast", name: "Boiled eggs with steamed callaloo and green banana", diets: VEG, caribbean: true },
-  { slot: "breakfast", name: "Curried channa and callaloo with roasted breadfruit", diets: ALL, caribbean: true },
+  { slot: "breakfast", name: "Greek yogurt with oats, berries and walnuts", diets: VEG, tags: ["dairy"], ing: "Greek yogurt 200 g; Rolled oats 40 g; Berries 100 g; Walnuts 15 g" },
+  { slot: "breakfast", name: "Scrambled eggs on wholegrain toast with spinach and tomato", diets: VEG, tags: ["gluten"], ing: "Eggs 3 pc; Wholegrain bread 2 slice; Spinach 50 g; Tomatoes 1 pc" },
+  { slot: "breakfast", name: "Tofu scramble with peppers, black beans and a corn tortilla", diets: ALL, ing: "Firm tofu 150 g; Bell peppers 1 pc; Black beans (canned) 80 g; Corn tortillas 1 pc" },
+  { slot: "breakfast", name: "Overnight oats with soy milk, chia, peanut butter and banana", diets: ALL, ing: "Rolled oats 50 g; Soy milk 200 ml; Chia seeds 10 g; Peanut butter 15 g; Bananas 1 pc" },
+  { slot: "breakfast", name: "Veggie omelette with avocado and a piece of fruit", diets: VEG, ing: "Eggs 3 pc; Bell peppers 0.5 pc; Onions 0.5 pc; Avocados 0.5 pc; Apples 1 pc" },
+  { slot: "breakfast", name: "Saltfish and callaloo with roasted breadfruit", diets: MEAT, tags: ["fish"], caribbean: true, ing: "Saltfish 100 g; Callaloo 100 g; Breadfruit 200 g; Onions 0.5 pc; Tomatoes 1 pc" },
+  { slot: "breakfast", name: "Cornmeal porridge made with milk or soy milk, topped with banana and nutmeg", diets: ALL, caribbean: true, ing: "Fine cornmeal 50 g; Soy milk or milk 300 ml; Bananas 1 pc; Peanuts 15 g" },
+  { slot: "breakfast", name: "Boiled eggs with steamed callaloo and green banana", diets: VEG, caribbean: true, ing: "Eggs 3 pc; Callaloo 100 g; Green bananas 2 pc" },
+  { slot: "breakfast", name: "Curried channa and callaloo with roasted breadfruit", diets: ALL, caribbean: true, ing: "Chickpeas (canned) 150 g; Callaloo 100 g; Breadfruit 150 g; Curry powder 1 tsp" },
   // Lunch
-  { slot: "lunch", name: "Grilled chicken, quinoa and roasted vegetable bowl", diets: MEAT },
-  { slot: "lunch", name: "Tuna and white bean salad in a wholegrain wrap", diets: MEAT, tags: ["fish", "gluten"] },
-  { slot: "lunch", name: "Lentil and vegetable soup with a side salad and brown rice", diets: ALL },
-  { slot: "lunch", name: "Chickpea, feta and cucumber salad with brown rice", diets: VEG, tags: ["dairy"] },
-  { slot: "lunch", name: "Tofu and vegetable stir-fry with brown rice (use tamari if gluten-free)", diets: ALL },
-  { slot: "lunch", name: "Stewed chicken with rice and peas and a large side salad", diets: MEAT, caribbean: true },
-  { slot: "lunch", name: "Baked flying fish with dasheen, sweet potato and callaloo", diets: MEAT, tags: ["fish"], caribbean: true },
-  { slot: "lunch", name: "Red bean stew with brown rice, pumpkin and cabbage salad", diets: ALL, caribbean: true },
-  { slot: "lunch", name: "Curried channa and potato with brown rice and cucumber salad", diets: ALL, caribbean: true },
+  { slot: "lunch", name: "Grilled chicken, quinoa and roasted vegetable bowl", diets: MEAT, ing: "Chicken breast 150 g; Quinoa 60 g; Zucchini 1 pc; Bell peppers 1 pc; Olive oil 1 tbsp" },
+  { slot: "lunch", name: "Tuna and white bean salad in a wholegrain wrap", diets: MEAT, tags: ["fish", "gluten"], ing: "Tuna (canned) 120 g; White beans (canned) 80 g; Wholegrain wraps 1 pc; Lettuce 50 g; Tomatoes 1 pc" },
+  { slot: "lunch", name: "Lentil and vegetable soup with a side salad and brown rice", diets: ALL, ing: "Red lentils 70 g; Carrots 1 pc; Onions 0.5 pc; Brown rice 50 g; Lettuce 50 g" },
+  { slot: "lunch", name: "Chickpea, feta and cucumber salad with brown rice", diets: VEG, tags: ["dairy"], ing: "Chickpeas (canned) 150 g; Feta 40 g; Cucumbers 0.5 pc; Brown rice 60 g; Olive oil 1 tbsp" },
+  { slot: "lunch", name: "Tofu and vegetable stir-fry with brown rice (use tamari if gluten-free)", diets: ALL, ing: "Firm tofu 150 g; Broccoli 150 g; Carrots 1 pc; Brown rice 60 g; Tamari or soy sauce 1 tbsp" },
+  { slot: "lunch", name: "Stewed chicken with rice and peas and a large side salad", diets: MEAT, caribbean: true, ing: "Chicken thighs (skinless) 150 g; Rice 60 g; Pigeon peas (canned) 60 g; Lettuce 50 g; Cucumbers 0.5 pc" },
+  { slot: "lunch", name: "Baked flying fish with dasheen, sweet potato and callaloo", diets: MEAT, tags: ["fish"], caribbean: true, ing: "Flying fish 150 g; Dasheen 150 g; Sweet potatoes 100 g; Callaloo 100 g" },
+  { slot: "lunch", name: "Red bean stew with brown rice, pumpkin and cabbage salad", diets: ALL, caribbean: true, ing: "Red kidney beans (canned) 150 g; Brown rice 60 g; Pumpkin 150 g; Cabbage 100 g" },
+  { slot: "lunch", name: "Curried channa and potato with brown rice and cucumber salad", diets: ALL, caribbean: true, ing: "Chickpeas (canned) 150 g; Potatoes 150 g; Brown rice 50 g; Cucumbers 0.5 pc; Curry powder 1 tsp" },
   // Dinner
-  { slot: "dinner", name: "Baked salmon with sweet potato and green beans", diets: MEAT, tags: ["fish"] },
-  { slot: "dinner", name: "Turkey or lean beef chilli with beans and rice", diets: MEAT },
-  { slot: "dinner", name: "Black bean and veggie tacos on corn tortillas with avocado", diets: ALL },
-  { slot: "dinner", name: "Egg and vegetable curry with brown rice", diets: VEG },
-  { slot: "dinner", name: "Tempeh or tofu with roasted vegetables and potatoes", diets: ALL },
-  { slot: "dinner", name: "Lighter oil down: chicken, breadfruit and callaloo with less coconut milk", diets: MEAT, caribbean: true },
-  { slot: "dinner", name: "Grilled jack fish with christophene, pumpkin and brown rice", diets: MEAT, tags: ["fish"], caribbean: true },
-  { slot: "dinner", name: "Lentil and pumpkin curry with rice and steamed bodi", diets: ALL, caribbean: true },
-  { slot: "dinner", name: "Jerk chicken (skin off) with roasted breadfruit and coleslaw", diets: MEAT, caribbean: true },
+  { slot: "dinner", name: "Baked salmon with sweet potato and green beans", diets: MEAT, tags: ["fish"], ing: "Salmon fillets 150 g; Sweet potatoes 200 g; Green beans 150 g" },
+  { slot: "dinner", name: "Turkey or lean beef chilli with beans and rice", diets: MEAT, ing: "Lean minced turkey or beef 130 g; Red kidney beans (canned) 80 g; Chopped tomatoes (canned) 200 g; Rice 50 g; Onions 0.5 pc" },
+  { slot: "dinner", name: "Black bean and veggie tacos on corn tortillas with avocado", diets: ALL, ing: "Black beans (canned) 150 g; Corn tortillas 3 pc; Bell peppers 1 pc; Avocados 0.5 pc; Limes 0.5 pc" },
+  { slot: "dinner", name: "Egg and vegetable curry with brown rice", diets: VEG, ing: "Eggs 3 pc; Spinach 80 g; Chopped tomatoes (canned) 150 g; Brown rice 60 g; Curry powder 1 tsp" },
+  { slot: "dinner", name: "Tempeh or tofu with roasted vegetables and potatoes", diets: ALL, ing: "Tempeh or firm tofu 150 g; Potatoes 200 g; Broccoli 150 g; Olive oil 1 tbsp" },
+  { slot: "dinner", name: "Lighter oil down: chicken, breadfruit and callaloo with less coconut milk", diets: MEAT, caribbean: true, ing: "Chicken thighs (skinless) 130 g; Breadfruit 200 g; Callaloo 100 g; Coconut milk 60 ml" },
+  { slot: "dinner", name: "Grilled jack fish with christophene, pumpkin and brown rice", diets: MEAT, tags: ["fish"], caribbean: true, ing: "Jack fish 150 g; Christophene 1 pc; Pumpkin 150 g; Brown rice 60 g" },
+  { slot: "dinner", name: "Lentil and pumpkin curry with rice and steamed bodi", diets: ALL, caribbean: true, ing: "Red lentils 70 g; Pumpkin 150 g; Rice 50 g; Bodi (long beans) 100 g; Curry powder 1 tsp" },
+  { slot: "dinner", name: "Jerk chicken (skin off) with roasted breadfruit and coleslaw", diets: MEAT, caribbean: true, ing: "Chicken thighs (skinless) 150 g; Breadfruit 200 g; Cabbage 100 g; Carrots 1 pc; Jerk seasoning 1 tbsp" },
   // Snacks
-  { slot: "snack", name: "Greek yogurt with fruit", diets: VEG, tags: ["dairy"] },
-  { slot: "snack", name: "Apple with peanut butter", diets: ALL },
-  { slot: "snack", name: "Hummus with carrot and cucumber sticks", diets: ALL },
-  { slot: "snack", name: "A handful of nuts and a banana", diets: ALL },
-  { slot: "snack", name: "Two boiled eggs and a piece of fruit", diets: VEG },
-  { slot: "snack", name: "Mango or golden apple with a handful of peanuts", diets: ALL, caribbean: true },
-  { slot: "snack", name: "Roasted channa (chickpeas)", diets: ALL, caribbean: true },
-  { slot: "snack", name: "Coconut water and a small handful of cashews", diets: ALL, caribbean: true },
+  { slot: "snack", name: "Greek yogurt with fruit", diets: VEG, tags: ["dairy"], ing: "Greek yogurt 170 g; Berries 80 g" },
+  { slot: "snack", name: "Apple with peanut butter", diets: ALL, ing: "Apples 1 pc; Peanut butter 20 g" },
+  { slot: "snack", name: "Hummus with carrot and cucumber sticks", diets: ALL, ing: "Hummus 60 g; Carrots 1 pc; Cucumbers 0.5 pc" },
+  { slot: "snack", name: "A handful of nuts and a banana", diets: ALL, ing: "Mixed nuts 25 g; Bananas 1 pc" },
+  { slot: "snack", name: "Two boiled eggs and a piece of fruit", diets: VEG, ing: "Eggs 2 pc; Oranges 1 pc" },
+  { slot: "snack", name: "Mango or golden apple with a handful of peanuts", diets: ALL, caribbean: true, ing: "Mangoes 1 pc; Peanuts 20 g" },
+  { slot: "snack", name: "Roasted channa (chickpeas)", diets: ALL, caribbean: true, ing: "Chickpeas (canned) 120 g; Olive oil 1 tsp" },
+  { slot: "snack", name: "Coconut water and a small handful of cashews", diets: ALL, caribbean: true, ing: "Coconut water 330 ml; Cashews 20 g" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -126,6 +128,17 @@ export interface MealTarget {
   /** Hand-portion guide: palms of protein, cupped hands of carbs, thumbs of fat, fists of veg. */
   portions: { protein: number; carbs: number; fats: number; veg: number };
   idea: string;
+  /** Ingredients for this meal, scaled to its calorie target. */
+  ingredients: Ingredient[];
+}
+export interface Ingredient {
+  name: string;
+  qty: number;
+  unit: "g" | "ml" | "pc" | "slice" | "tbsp" | "tsp";
+}
+export interface PlanDay {
+  day: string;
+  meals: MealTarget[];
 }
 export interface NutritionPlan {
   kcal: number | null;
@@ -133,6 +146,8 @@ export interface NutritionPlan {
   fibreG: number | null;
   waterL: number;
   meals: MealTarget[];
+  /** Seven days of meals; the sample day is the first. */
+  week: PlanDay[];
   foods: Record<"protein" | "carbs" | "fats" | "veg", string[]>;
   limit: string[];
   timing: string[];
@@ -198,6 +213,63 @@ export function splitMacros(kcal: number, proteinG: number): { protein: Macro; c
   };
 }
 
+const WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** Parses "Eggs 3 pc; Spinach 50 g" into ingredient objects. */
+export function parseIngredients(spec: string): Ingredient[] {
+  return spec.split(";").map((part) => {
+    const m = part.trim().match(/^(.*\S)\s+([\d.]+)\s+(g|ml|pc|slice|tbsp|tsp)$/);
+    if (!m) throw new Error(`Bad ingredient: ${part}`);
+    return { name: m[1], qty: Number(m[2]), unit: m[3] as Ingredient["unit"] };
+  });
+}
+
+function planDay(
+  split: { label: string; slot: Slot; share: number }[],
+  ideas: MealIdea[],
+  kcal: number | null,
+  macros: { protein: Macro; carbs: Macro; fats: Macro } | null,
+  variant: number,
+): MealTarget[] {
+  let snackIndex = 0;
+  return split.map((s) => {
+    const options = ideas.filter((m) => m.slot === s.slot);
+    const offset = s.slot === "snack" ? snackIndex++ : 0;
+    const chosen = options.length ? options[(variant + offset) % options.length] : null;
+    const mealKcal = kcal ? Math.round((kcal * s.share) / 10) * 10 : null;
+    const g = (m: Macro) => m.grams * s.share;
+    // Without numeric targets, fall back to the standard hand-portion guide for a main meal or snack.
+    const portions = macros
+      ? {
+          protein: half(g(macros.protein) / 25),
+          carbs: half(g(macros.carbs) / 25),
+          fats: half(g(macros.fats) / 9),
+          veg: s.slot === "snack" ? 0 : s.slot === "breakfast" ? 1 : 2,
+        }
+      : s.slot === "snack"
+        ? { protein: 0.5, carbs: 0.5, fats: 0.5, veg: 0 }
+        : { protein: 1, carbs: 1, fats: 1, veg: 2 };
+    // Ingredient amounts are written for ~500 kcal meals / ~200 kcal snacks; scale to this meal.
+    const reference = s.slot === "snack" ? 200 : 500;
+    const scale = mealKcal ? Math.min(1.8, Math.max(0.6, mealKcal / reference)) : 1;
+    const ingredients = chosen
+      ? parseIngredients(chosen.ing).map((i) => ({
+          ...i,
+          qty: i.unit === "g" || i.unit === "ml" ? Math.round((i.qty * scale) / 5) * 5 : Math.round(i.qty * scale * 2) / 2,
+        }))
+      : [];
+    return {
+      label: s.label,
+      slot: s.slot,
+      kcal: mealKcal,
+      proteinG: macros ? Math.round(macros.protein.grams * s.share) : null,
+      portions,
+      idea: chosen?.name ?? "",
+      ingredients,
+    };
+  });
+}
+
 /* ------------------------------------------------------------------ */
 /* Builder                                                             */
 /* ------------------------------------------------------------------ */
@@ -212,33 +284,8 @@ export function buildNutrition(p: Profile, n: Numbers, variant = 0): NutritionPl
   const split = SPLITS[p.mealsPerDay] ?? SPLITS[4];
 
   const ideas = byCuisine(p, MEALS.filter((m) => allowed(p, m)));
-  const usedSnack: Record<string, number> = {};
-  const meals: MealTarget[] = split.map((s) => {
-    const options = ideas.filter((m) => m.slot === s.slot);
-    const offset = s.slot === "snack" ? (usedSnack.snack = (usedSnack.snack ?? -1) + 1) : 0;
-    const idea = options.length ? options[(variant + offset) % options.length].name : "";
-    const mealKcal = kcal ? Math.round((kcal * s.share) / 10) * 10 : null;
-    const g = (m: Macro | undefined) => (m ? m.grams * s.share : 0);
-    // Without numeric targets, fall back to the standard hand-portion guide for a main meal or snack.
-    const portions = macros
-      ? {
-          protein: half(g(macros.protein) / 25),
-          carbs: half(g(macros.carbs) / 25),
-          fats: half(g(macros.fats) / 9),
-          veg: s.slot === "snack" ? 0 : s.slot === "breakfast" ? 1 : 2,
-        }
-      : s.slot === "snack"
-        ? { protein: 0.5, carbs: 0.5, fats: 0.5, veg: 0 }
-        : { protein: 1, carbs: 1, fats: 1, veg: 2 };
-    return {
-      label: s.label,
-      slot: s.slot,
-      kcal: mealKcal,
-      proteinG: macros ? Math.round(macros.protein.grams * s.share) : null,
-      portions,
-      idea,
-    };
-  });
+  const week: PlanDay[] = WEEK.map((day, d) => ({ day, meals: planDay(split, ideas, kcal, macros, variant + d) }));
+  const meals = week[0].meals;
 
   const foodList = (k: keyof typeof FOODS) => byCuisine(p, FOODS[k].filter((f) => allowed(p, f))).map((f) => f.name);
 
@@ -293,6 +340,7 @@ export function buildNutrition(p: Profile, n: Numbers, variant = 0): NutritionPl
     fibreG: kcal ? Math.round((14 * kcal) / 1000) : null,
     waterL: n.waterL,
     meals,
+    week,
     foods: { protein: foodList("protein"), carbs: foodList("carbs"), fats: foodList("fats"), veg: foodList("veg") },
     limit: [
       "Sugary drinks, sweetened juices and energy drinks",

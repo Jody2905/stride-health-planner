@@ -105,6 +105,14 @@ export function calculate(p: Profile, units: Units = "metric"): Numbers {
         "Because you have a condition or take medication, ask your doctor before starting this plan, and check every supplement with a pharmacist for interactions.",
     });
   }
+  if (p.injuries.length) {
+    flags.push({
+      level: "info",
+      title: "Plan adjusted for your injuries",
+      message:
+        "Exercises that load your injured areas have been swapped for safer options. See the Workouts tab for details, and check with a physiotherapist if an injury is recent or getting worse.",
+    });
+  }
   if (p.age >= 65) {
     flags.push({
       level: "info",

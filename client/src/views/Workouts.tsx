@@ -9,11 +9,15 @@ export function Workouts({
   daysPerWeek,
   workoutLog,
   onToggleToday,
+  onAvoid,
+  onRestore,
 }: {
   plan: Plan;
   daysPerWeek: number;
   workoutLog: WorkoutEntry[];
   onToggleToday: (title: string, done: boolean) => void;
+  onAvoid: (name: string) => void;
+  onRestore: (name: string | null) => void;
 }) {
   const w = plan.workouts;
   const today = WEEKDAY_OF();
@@ -34,8 +38,37 @@ export function Workouts({
       <Banners flags={plan.numbers.flags} only={["stop"]} />
       <Heading
         title={`Your week · ${daysPerWeek} training days`}
-        sub={`Sets × reps are on the right. Tap an exercise to see how to do it. Rest ${w.restBetweenSets} between sets. Aim for ${w.weeklyCardioMinutes} minutes of moderate cardio across the week.`}
+        sub={`Sets × reps are on the right. Tap an exercise to see how to do it, or ↻ to swap it for another. Rest ${w.restBetweenSets} between sets. Aim for ${w.weeklyCardioMinutes} minutes of moderate cardio across the week.`}
       />
+      {w.injuryNotes.length > 0 && (
+        <div className="banner info">
+          <span className="ic" aria-hidden>
+            i
+          </span>
+          <div>
+            <b>Adjusted for your injuries</b>
+            <ul className="tight">
+              {w.injuryNotes.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+      {w.avoided.length > 0 && (
+        <div className="avoided">
+          <span className="muted small">Swapped out:</span>
+          {w.avoided.map((name) => (
+            <button key={name} type="button" className="chip-btn" onClick={() => onRestore(name)} title="Put this exercise back">
+              {name} <span aria-hidden>↺</span>
+              <span className="sr">Restore {name}</span>
+            </button>
+          ))}
+          <button type="button" className="link small" onClick={() => onRestore(null)}>
+            Restore all
+          </button>
+        </div>
+      )}
       <div className="week">
         {w.days.map((d) => {
           const isToday = d.day === today;
@@ -56,6 +89,13 @@ export function Workouts({
                         {e.name}
                       </button>
                       <span className="rx">{e.prescription}</span>
+                      {e.swappable ? (
+                        <button type="button" className="swap" onClick={() => onAvoid(e.name)} aria-label={`Swap ${e.name} for another exercise`} title="Swap for another exercise">
+                          ↻
+                        </button>
+                      ) : (
+                        <span className="swap-none" aria-hidden />
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -78,6 +118,7 @@ export function Workouts({
       <dialog ref={dlg} aria-labelledby="exd-t">
         <h4 id="exd-t">{ex?.name}</h4>
         <p className="muted">How to do it · {ex?.prescription}</p>
+        {ex?.cue && <p className="cue">{ex.cue}</p>}
         <ol>
           {ex?.howTo.map((s) => (
             <li key={s}>{s}</li>

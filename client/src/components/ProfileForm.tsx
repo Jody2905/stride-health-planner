@@ -1,4 +1,4 @@
-import { LB_PER_KG, ProfileSchema, type Profile, type Units } from "@stride/engine";
+import { INJURY_AREAS, INJURY_LABEL, LB_PER_KG, ProfileSchema, type InjuryArea, type Profile, type Units } from "@stride/engine";
 import { useEffect, useState } from "react";
 
 interface Draft {
@@ -65,6 +65,8 @@ export function ProfileForm({ profile, units, onChange }: { profile: Profile; un
     onChange: (e: React.ChangeEvent<HTMLSelectElement>) => set(k, (numeric ? Number(e.target.value) : e.target.value) as Profile[K]),
   });
   const wUnit = units === "metric" ? "kg" : "lb";
+  const toggleInjury = (a: InjuryArea) =>
+    set("injuries", profile.injuries.includes(a) ? profile.injuries.filter((x) => x !== a) : [...profile.injuries, a]);
 
   return (
     <form className="panel" onSubmit={(e) => e.preventDefault()} aria-label="Your profile">
@@ -145,6 +147,22 @@ export function ProfileForm({ profile, units, onChange }: { profile: Profile; un
             <option value="gym">Full gym</option>
           </select>
         </div>
+
+        <fieldset className="f full injuries">
+          <legend className="lbl">Injuries or limitations</legend>
+          <div className="chips">
+            {INJURY_AREAS.map((a) => (
+              <label key={a} className="chip">
+                <input type="checkbox" id={`inj-${a}`} checked={profile.injuries.includes(a)} onChange={() => toggleInjury(a)} />
+                {INJURY_LABEL[a]}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <label className="check">
+          <input type="checkbox" id="lowImpact" checked={profile.lowImpact} onChange={(e) => set("lowImpact", e.target.checked)} /> Low-impact cardio only (no
+          running or jumping)
+        </label>
 
         <div className="sep" />
         <div className="f">

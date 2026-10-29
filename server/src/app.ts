@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { checkPassword, DUMMY_HASH, hashPassword, makeAuth, type AuthedRequest } from "./auth";
-import type { DB } from "./db";
+import { newFriendCode, type DB } from "./db";
 
 export interface AppOptions {
   db: DB;
@@ -35,6 +35,19 @@ const IsoDate = z
   .refine((d) => Date.parse(d) <= Date.now() + 36e5 * 24, "Date can't be in the future.");
 const WeightBody = z.object({ date: IsoDate, weightKg: z.number().min(30).max(300) });
 const WorkoutBody = z.object({ date: IsoDate, title: z.string().trim().min(1).max(60) });
+const StepsBody = z.object({ date: IsoDate, steps: z.number().int().min(0).max(100000) });
+const FriendCode = z
+  .string()
+  .transform((c) => c.toUpperCase().replace(/[\s-]/g, ""))
+  .pipe(z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/, "Friend codes look like K7QM-X2PD."))
+  .transform((c) => `${c.slice(0, 4)}-${c.slice(4)}`);
+const UserIdParam = z.coerce.number().int().positive();
+const MAX_PENDING = 20;
+
+function weekDates(monday: string): string[] {
+  const start = Date.parse(monday + "T00:00:00Z");
+  return Array.from({ length: 7 }, (_, i) => new Date(start + i * 864e5).toISOString().slice(0, 10));
+}
 
 /** Wraps async handlers so thrown errors reach the error middleware. */
 const h =
@@ -82,7 +95,7 @@ export function createApp(opts: AppOptions) {
   const q = {
     userByEmail: db.prepare<[string], { id: number; name: string; email: string; password_hash: string }>("SELECT * FROM users WHERE email = ?"),
     userById: db.prepare<[number], { id: number; name: string; email: string; created_at: string }>("SELECT id, name, email, created_at FROM users WHERE id = ?"),
-    insertUser: db.prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)"),
+    insertUser: db.prepare<[string, string, string, string]>("INSERT INTO users (name, email, password_hash, friend_code) VALUES (?, ?, ?, ?)"),
     deleteUser: db.prepare("DELETE FROM users WHERE id = ?"),
     profile: db.prepare<[number], { data: string; units: string; updated_at: string }>("SELECT data, units, updated_at FROM profiles WHERE user_id = ?"),
     upsertProfile: db.prepare(
@@ -101,7 +114,52 @@ export function createApp(opts: AppOptions) {
        ON CONFLICT(user_id, date) DO UPDATE SET title = excluded.title`,
     ),
     deleteWorkout: db.prepare("DELETE FROM workout_logs WHERE user_id = ? AND date = ?"),
+    steps: db.prepare<[number], { date: string; steps: number }>("SELECT date, steps FROM step_logs WHERE user_id = ? ORDER BY date"),
+    upsertSteps: db.prepare(
+      `INSERT INTO step_logs (user_id, date, steps) VALUES (?, ?, ?)
+       ON CONFLICT(user_id, date) DO UPDATE SET steps = excluded.steps`,
+    ),
+    deleteSteps: db.prepare("DELETE FROM step_logs WHERE user_id = ? AND date = ?"),
+    myCode: db.prepare<[number], { friend_code: string }>("SELECT friend_code FROM users WHERE id = ?"),
+    setCode: db.prepare("UPDATE users SET friend_code = ? WHERE id = ?"),
+    userByCode: db.prepare<[string], { id: number; name: string }>("SELECT id, name FROM users WHERE friend_code = ?"),
+    friendships: db.prepare<[number, number, number], { id: number; name: string; status: string; requester_id: number }>(
+      `SELECT u.id, u.name, f.status, f.requester_id
+         FROM friendships f
+         JOIN users u ON u.id = CASE WHEN f.requester_id = ?1 THEN f.addressee_id ELSE f.requester_id END
+        WHERE f.requester_id = ?2 OR f.addressee_id = ?3
+        ORDER BY u.name`,
+    ),
+    pair: db.prepare<[number, number, number, number], { requester_id: number; status: string }>(
+      "SELECT requester_id, status FROM friendships WHERE (requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)",
+    ),
+    pendingOut: db.prepare<[number], { n: number }>("SELECT COUNT(*) AS n FROM friendships WHERE requester_id = ? AND status = 'pending'"),
+    insertFriend: db.prepare("INSERT INTO friendships (requester_id, addressee_id, status) VALUES (?, ?, 'pending')"),
+    acceptFriend: db.prepare("UPDATE friendships SET status = 'accepted' WHERE requester_id = ? AND addressee_id = ? AND status = 'pending'"),
+    deleteFriend: db.prepare("DELETE FROM friendships WHERE (requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)"),
+    // The signed-in user plus accepted friends, with their steps for the week. Nobody else's data can appear here.
+    board: db.prepare<[string, string, number, number, number, number], { id: number; name: string; goal: number | null; date: string | null; steps: number | null }>(
+      `SELECT u.id, u.name, json_extract(p.data, '$.stepGoal') AS goal, s.date, s.steps
+         FROM users u
+         LEFT JOIN profiles p ON p.user_id = u.id
+         LEFT JOIN step_logs s ON s.user_id = u.id AND s.date BETWEEN ? AND ?
+        WHERE u.id = ?
+           OR u.id IN (SELECT CASE WHEN requester_id = ? THEN addressee_id ELSE requester_id END
+                         FROM friendships
+                        WHERE status = 'accepted' AND (requester_id = ? OR addressee_id = ?))`,
+    ),
   };
+
+  function friendsOf(me: number) {
+    const rows = q.friendships.all(me, me, me);
+    const pick = (f: (r: (typeof rows)[number]) => boolean) => rows.filter(f).map((r) => ({ id: r.id, name: r.name }));
+    return {
+      code: q.myCode.get(me)?.friend_code ?? "",
+      friends: pick((r) => r.status === "accepted"),
+      incoming: pick((r) => r.status === "pending" && r.requester_id !== me),
+      outgoing: pick((r) => r.status === "pending" && r.requester_id === me),
+    };
+  }
 
   const getProfile = (userId: number) => {
     const row = q.profile.get(userId);
@@ -118,7 +176,7 @@ export function createApp(opts: AppOptions) {
     h(async (req, res) => {
       const body = RegisterBody.parse(req.body);
       if (q.userByEmail.get(body.email)) return res.status(409).json({ error: "An account with that email already exists. Sign in instead." });
-      const info = q.insertUser.run(body.name, body.email, await hashPassword(body.password));
+      const info = q.insertUser.run(body.name, body.email, await hashPassword(body.password), newFriendCode());
       const id = Number(info.lastInsertRowid);
       auth.issue(res, id);
       res.status(201).json({ user: q.userById.get(id) });
@@ -234,6 +292,106 @@ export function createApp(opts: AppOptions) {
     }),
   );
 
+  /* ---------------- walking tracker ---------------- */
+  app.get("/api/steps", auth.requireUser, h((req, res) => res.json(q.steps.all(req.userId!))));
+  app.post(
+    "/api/steps",
+    auth.requireUser,
+    h((req, res) => {
+      const b = StepsBody.parse(req.body);
+      q.upsertSteps.run(req.userId!, b.date, b.steps);
+      res.status(201).json(q.steps.all(req.userId!));
+    }),
+  );
+  app.delete(
+    "/api/steps/:date",
+    auth.requireUser,
+    h((req, res) => {
+      q.deleteSteps.run(req.userId!, IsoDate.parse(req.params.date));
+      res.json(q.steps.all(req.userId!));
+    }),
+  );
+
+  app.get("/api/friends", auth.requireUser, h((req, res) => res.json(friendsOf(req.userId!))));
+
+  app.post(
+    "/api/friends",
+    auth.requireUser,
+    h((req, res) => {
+      const me = req.userId!;
+      const code = FriendCode.parse(req.body?.code);
+      const other = q.userByCode.get(code);
+      if (!other) return res.status(404).json({ error: "No one has that friend code. Check it and try again." });
+      if (other.id === me) return res.status(400).json({ error: "That's your own code. Share it with a friend instead." });
+      const existing = q.pair.get(me, other.id, other.id, me);
+      if (existing?.status === "accepted") return res.status(409).json({ error: `You and ${other.name} are already friends.` });
+      if (existing && existing.requester_id === me) return res.status(409).json({ error: `You've already sent ${other.name} a request.` });
+      if (existing) {
+        // They already asked us: adding their code accepts it.
+        q.acceptFriend.run(other.id, me);
+        return res.json({ ...friendsOf(me), message: `You and ${other.name} are now friends.` });
+      }
+      if ((q.pendingOut.get(me)?.n ?? 0) >= MAX_PENDING)
+        return res.status(429).json({ error: "You have too many requests waiting. Wait for some to be accepted first." });
+      q.insertFriend.run(me, other.id);
+      res.status(201).json({ ...friendsOf(me), message: `Request sent to ${other.name}.` });
+    }),
+  );
+
+  app.post(
+    "/api/friends/:id/accept",
+    auth.requireUser,
+    h((req, res) => {
+      const info = q.acceptFriend.run(UserIdParam.parse(req.params.id), req.userId!);
+      if (!Number(info.changes)) return res.status(404).json({ error: "That request no longer exists." });
+      res.json(friendsOf(req.userId!));
+    }),
+  );
+
+  /** Removes a friend, declines a request, or cancels one you sent. */
+  app.delete(
+    "/api/friends/:id",
+    auth.requireUser,
+    h((req, res) => {
+      const me = req.userId!;
+      const other = UserIdParam.parse(req.params.id);
+      q.deleteFriend.run(me, other, other, me);
+      res.json(friendsOf(me));
+    }),
+  );
+
+  /** Issues a new friend code; the old one stops working. */
+  app.post(
+    "/api/friends/code",
+    auth.requireUser,
+    h((req, res) => {
+      q.setCode.run(newFriendCode(), req.userId!);
+      res.json(friendsOf(req.userId!));
+    }),
+  );
+
+  app.get(
+    "/api/walking/leaderboard",
+    auth.requireUser,
+    h((req, res) => {
+      const me = req.userId!;
+      const week = IsoDate.parse(req.query.week);
+      const dates = weekDates(week);
+      const rows = q.board.all(dates[0], dates[6], me, me, me, me);
+      const people = new Map<number, { id: number; name: string; isMe: boolean; goal: number; daily: number[]; total: number }>();
+      for (const r of rows) {
+        const person = people.get(r.id) ?? { id: r.id, name: r.name, isMe: r.id === me, goal: r.goal ?? 8000, daily: Array(7).fill(0), total: 0 };
+        if (r.date && r.steps != null) {
+          person.daily[dates.indexOf(r.date)] = r.steps;
+          person.total += r.steps;
+        }
+        people.set(r.id, person);
+      }
+      const members = [...people.values()].sort((a, b) => b.total - a.total);
+      res.json({ week: dates, members });
+    }),
+  );
+
   /** Lets users download everything stored about them. */
   app.get(
     "/api/export",
@@ -241,7 +399,8 @@ export function createApp(opts: AppOptions) {
     h((req, res) => {
       const id = req.userId!;
       res.setHeader("Content-Disposition", 'attachment; filename="stride-data.json"');
-      res.json({ user: q.userById.get(id), ...getProfile(id), weights: q.weights.all(id), workouts: q.workouts.all(id) });
+      const { friends } = friendsOf(id);
+      res.json({ user: q.userById.get(id), ...getProfile(id), weights: q.weights.all(id), workouts: q.workouts.all(id), steps: q.steps.all(id), friends: friends.map((f) => f.name) });
     }),
   );
 

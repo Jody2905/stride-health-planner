@@ -1,23 +1,27 @@
 import { buildPlan, DEFAULT_PROFILE, ProfileSchema, type Profile, type Units } from "@stride/engine";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, apiStore, DEMO, local, localStore, type ProgressStore, type User, type WeightEntry, type WorkoutEntry } from "./api";
+import { api, apiStore, DEMO, local, localStore, type ProgressStore, type StepEntry, type User, type WeightEntry, type WorkoutEntry } from "./api";
 import { AccountMenu, AuthDialog } from "./components/Account";
 import { ProfileForm } from "./components/ProfileForm";
 import { isoToday } from "./format";
+import { Groceries } from "./views/Groceries";
 import { Health, Research } from "./views/Health";
 import { Nutrition } from "./views/Nutrition";
 import { Overview } from "./views/Overview";
 import { Progress } from "./views/Progress";
 import { Supplements } from "./views/Supplements";
+import { Walking } from "./views/Walking";
 import { Workouts } from "./views/Workouts";
 
 const TABS = [
   ["overview", "Overview"],
   ["workouts", "Workouts"],
   ["nutrition", "Nutrition"],
+  ["groceries", "Meals & groceries"],
   ["supplements", "Supplements"],
-  ["health", "Daily health"],
+  ["walking", "Walking"],
   ["progress", "Progress"],
+  ["health", "Daily health"],
   ["research", "Research"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
@@ -41,6 +45,7 @@ export default function App() {
   const [variant, setVariant] = useState(0);
   const [weights, setWeights] = useState<WeightEntry[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
+  const [steps, setSteps] = useState<StepEntry[]>([]);
   const [auth, setAuth] = useState<null | "signin" | "register">(null);
   const [saveState, setSaveState] = useState<"" | "saving" | "saved" | "error">("");
   const store: ProgressStore = user ? apiStore : localStore;
@@ -49,9 +54,10 @@ export default function App() {
   const plan = useMemo(() => buildPlan(profile, { units, mealVariant: variant }), [profile, units, variant]);
 
   const loadLogs = useCallback(async (s: ProgressStore) => {
-    const [w, k] = await Promise.all([s.weights(), s.workouts()]);
+    const [w, k, st] = await Promise.all([s.weights(), s.workouts(), s.steps()]);
     setWeights(w);
     setWorkouts(k);
+    setSteps(st);
   }, []);
 
   // Restore session on load (full-stack build only).
@@ -108,6 +114,7 @@ export default function App() {
       await api.saveProfile(profile, units);
       for (const w of await localStore.weights()) await apiStore.addWeight(w);
       for (const w of await localStore.workouts()) await apiStore.addWorkout(w);
+      for (const st of await localStore.steps()) await apiStore.addSteps(st);
     } else {
       setProfile(me.profile);
       setUnits(me.units);
@@ -140,6 +147,11 @@ export default function App() {
   async function toggleToday(title: string, done: boolean) {
     setWorkouts(done ? await store.addWorkout({ date: isoToday(), title }) : await store.deleteWorkout(isoToday()));
   }
+
+  const avoid = (name: string) => setProfile((p) => ({ ...p, avoidExercises: [...p.avoidExercises, name].slice(-60) }));
+  const restore = (name: string | null) =>
+    setProfile((p) => ({ ...p, avoidExercises: name ? p.avoidExercises.filter((n) => n !== name) : [] }));
+  const groceryKey = [variant, profile.diet, profile.cuisine, profile.mealsPerDay, profile.dairyFree, profile.glutenFree].join("|");
 
   const storageNote = user
     ? "Saved to your account, so it's available on any device."
@@ -197,9 +209,23 @@ export default function App() {
             ))}
           </nav>
           {tab === "overview" && <Overview plan={plan} profile={profile} units={units} />}
-          {tab === "workouts" && <Workouts plan={plan} daysPerWeek={profile.daysPerWeek} workoutLog={workouts} onToggleToday={toggleToday} />}
+          {tab === "workouts" && (
+            <Workouts plan={plan} daysPerWeek={profile.daysPerWeek} workoutLog={workouts} onToggleToday={toggleToday} onAvoid={avoid} onRestore={restore} />
+          )}
           {tab === "nutrition" && <Nutrition plan={plan} profile={profile} onAnotherDay={() => setVariant((v) => v + 1)} />}
+          {tab === "groceries" && <Groceries plan={plan} weekKey={groceryKey} onNewWeek={() => setVariant((v) => v + 7)} />}
           {tab === "supplements" && <Supplements plan={plan} profile={profile} />}
+          {tab === "walking" && (
+            <Walking
+              signedIn={!!user}
+              steps={steps}
+              goal={profile.stepGoal}
+              onGoal={(g) => setProfile((p) => ({ ...p, stepGoal: g }))}
+              onAddSteps={async (e) => setSteps(await store.addSteps(e))}
+              onDeleteSteps={async (d) => setSteps(await store.deleteSteps(d))}
+              onCreateAccount={() => setAuth("register")}
+            />
+          )}
           {tab === "health" && <Health plan={plan} />}
           {tab === "progress" && (
             <Progress

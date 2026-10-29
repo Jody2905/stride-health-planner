@@ -16,6 +16,29 @@ export interface WorkoutEntry {
   date: string;
   title: string;
 }
+export interface StepEntry {
+  date: string;
+  steps: number;
+}
+export interface Friend {
+  id: number;
+  name: string;
+}
+export interface FriendsState {
+  code: string;
+  friends: Friend[];
+  incoming: Friend[];
+  outgoing: Friend[];
+  message?: string;
+}
+export interface BoardMember {
+  id: number;
+  name: string;
+  isMe: boolean;
+  goal: number;
+  daily: number[];
+  total: number;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -46,6 +69,12 @@ export const api = {
   logout: () => call<void>("POST", "/api/auth/logout"),
   deleteAccount: () => call<void>("DELETE", "/api/account"),
   saveProfile: (profile: Profile, units: Units) => call("PUT", "/api/profile", { profile, units }),
+  friends: () => call<FriendsState>("GET", "/api/friends"),
+  addFriend: (code: string) => call<FriendsState>("POST", "/api/friends", { code }),
+  acceptFriend: (id: number) => call<FriendsState>("POST", `/api/friends/${id}/accept`),
+  removeFriend: (id: number) => call<FriendsState>("DELETE", `/api/friends/${id}`),
+  resetCode: () => call<FriendsState>("POST", "/api/friends/code"),
+  leaderboard: (week: string) => call<{ week: string[]; members: BoardMember[] }>("GET", `/api/walking/leaderboard?week=${encodeURIComponent(week)}`),
 };
 
 /* ------------------------------------------------------------------ */
@@ -59,6 +88,9 @@ export interface ProgressStore {
   workouts(): Promise<WorkoutEntry[]>;
   addWorkout(e: WorkoutEntry): Promise<WorkoutEntry[]>;
   deleteWorkout(date: string): Promise<WorkoutEntry[]>;
+  steps(): Promise<StepEntry[]>;
+  addSteps(e: StepEntry): Promise<StepEntry[]>;
+  deleteSteps(date: string): Promise<StepEntry[]>;
 }
 
 export const apiStore: ProgressStore = {
@@ -68,6 +100,9 @@ export const apiStore: ProgressStore = {
   workouts: () => call("GET", "/api/workouts"),
   addWorkout: (e) => call("POST", "/api/workouts", e),
   deleteWorkout: (d) => call("DELETE", `/api/workouts/${encodeURIComponent(d)}`),
+  steps: () => call("GET", "/api/steps"),
+  addSteps: (e) => call("POST", "/api/steps", e),
+  deleteSteps: (d) => call("DELETE", `/api/steps/${encodeURIComponent(d)}`),
 };
 
 export const local = {
@@ -108,4 +143,7 @@ export const localStore: ProgressStore = {
   workouts: async () => local.get("workouts", []),
   addWorkout: async (e) => upsert("workouts", e),
   deleteWorkout: async (d) => remove("workouts", d),
+  steps: async () => local.get("steps", []),
+  addSteps: async (e) => upsert("steps", e),
+  deleteSteps: async (d) => remove("steps", d),
 };

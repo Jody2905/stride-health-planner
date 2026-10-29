@@ -118,3 +118,55 @@ describe("schema", () => {
     expect(ProfileSchema.safeParse(p()).success).toBe(true);
   });
 });
+
+describe("injuries and exercise swaps", () => {
+  const names = (pl: ReturnType<typeof buildPlan>) => pl.workouts.days.flatMap((d) => d.exercises.map((e) => e.name));
+
+  it("never picks an exercise that loads an injured area", () => {
+    for (const equipment of ["none", "home", "gym"] as const) {
+      const list = names(buildPlan(p({ equipment, daysPerWeek: 4, injuries: ["knee", "back", "shoulder"] }))).join();
+      expect(list).not.toMatch(/Barbell back squat|Goblet squat|Walking lunge|Split squat|Reverse lunge|Romanian deadlift|Overhead press|Bench press|Push-up|Hanging/);
+    }
+  });
+
+  it("swaps out an exercise the user chose to avoid", () => {
+    const before = names(buildPlan(p({ equipment: "gym", daysPerWeek: 4 })));
+    expect(before).toContain("Bench press");
+    const after = names(buildPlan(p({ equipment: "gym", daysPerWeek: 4, avoidExercises: ["Bench press"] })));
+    expect(after).not.toContain("Bench press");
+    expect(after.length).toBe(before.length);
+  });
+
+  it("keeps cardio low impact for knee injuries and explains the changes", () => {
+    const w = buildPlan(p({ injuries: ["knee"] })).workouts;
+    expect(w.days.find((d) => d.type === "rest" && d.day !== "Sun")!.note).toMatch(/cycle, swim/);
+    expect(w.injuryNotes.join()).toMatch(/Knees/);
+  });
+
+  it("accepts older saved profiles without the new fields", () => {
+    const { injuries, lowImpact, avoidExercises, stepGoal, ...old } = DEFAULT_PROFILE;
+    const r = ProfileSchema.safeParse(old);
+    expect(r.success && r.data.injuries).toEqual([]);
+  });
+});
+
+describe("weekly meal plan and grocery list", () => {
+  it("plans seven days and totals the ingredients", () => {
+    const plan = buildPlan(p());
+    expect(plan.nutrition.week).toHaveLength(7);
+    const items = plan.groceries.flatMap((g) => g.items);
+    expect(items.length).toBeGreaterThan(10);
+    expect(items.every((i) => i.qty > 0)).toBe(true);
+  });
+
+  it("only lists groceries that fit the diet", () => {
+    const text = buildPlan(p({ diet: "vegan", cuisine: "caribbean" })).groceries.flatMap((g) => g.items.map((i) => i.name)).join().toLowerCase();
+    for (const w of ["chicken", "fish", "egg", "yogurt", "feta", "salmon", "tuna", "beef"]) expect(text).not.toContain(w);
+  });
+
+  it("buys more food for a bigger calorie target", () => {
+    const total = (pl: ReturnType<typeof buildPlan>) =>
+      pl.groceries.flatMap((g) => g.items).filter((i) => i.unit === "g").reduce((a, i) => a + i.qty, 0);
+    expect(total(buildPlan(p({ sex: "male", weightKg: 90, goalKg: 95, heightCm: 185, activity: "active" })))).toBeGreaterThan(total(buildPlan(p())));
+  });
+});
