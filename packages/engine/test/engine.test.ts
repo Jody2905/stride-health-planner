@@ -170,3 +170,89 @@ describe("weekly meal plan and grocery list", () => {
     expect(total(buildPlan(p({ sex: "male", weightKg: 90, goalKg: 95, heightCm: 185, activity: "active" })))).toBeGreaterThan(total(buildPlan(p())));
   });
 });
+
+describe("body recomposition and muscle building", () => {
+  const gym = { equipment: "gym" as const, experience: "intermediate" as const };
+
+  it("old saved profiles still parse and get the general plan", () => {
+    const { focus, priorityMuscles, split, ...old } = DEFAULT_PROFILE;
+    const parsed = ProfileSchema.parse(old);
+    expect(parsed.focus).toBe("general");
+    expect(buildPlan(parsed).workouts.focus).toBe("general");
+  });
+
+  it("recomp uses a small deficit and high protein", () => {
+    const n = calculate(p({ focus: "recomp", weightKg: 80, goalKg: 80, heightCm: 170 })); // BMI 27.7
+    expect(n.focus).toBe("recomp");
+    expect(n.targetKcal!).toBeLessThan(n.tdee);
+    expect(n.tdee - n.targetKcal!).toBeLessThanOrEqual(500);
+    expect(n.proteinPerKg).toEqual([2.0, 2.4]);
+  });
+
+  it("recomp stays at maintenance for lean people", () => {
+    const n = calculate(p({ focus: "recomp", weightKg: 58, goalKg: 58, heightCm: 170 })); // BMI 20.1
+    expect(Math.abs(n.targetKcal! - n.tdee)).toBeLessThan(10);
+  });
+
+  it("muscle building uses a modest surplus, smaller for advanced lifters", () => {
+    const base = { focus: "muscle" as const, weightKg: 65, goalKg: 70, heightCm: 175 };
+    const beg = calculate(p({ ...base, experience: "beginner" }));
+    const adv = calculate(p({ ...base, experience: "advanced" }));
+    expect(beg.targetKcal! - beg.tdee).toBeGreaterThan(150);
+    expect(beg.targetKcal! - beg.tdee).toBeLessThanOrEqual(360);
+    expect(adv.targetKcal! - adv.tdee).toBeLessThan(beg.targetKcal! - beg.tdee);
+    expect(beg.goal).toBe("gain");
+  });
+
+  it("switches muscle building to recomp when the goal is weight loss", () => {
+    const n = calculate(p({ focus: "muscle" })); // 72 → 65 kg
+    expect(n.focus).toBe("recomp");
+    expect(n.flags.some((f) => f.title === "Planned as body recomposition")).toBe(true);
+  });
+
+  it("keeps the general plan during pregnancy", () => {
+    expect(calculate(p({ focus: "muscle", pregnant: true })).focus).toBe("general");
+  });
+
+  it("picks the split from days per week", () => {
+    const split = (d: number) => buildPlan(p({ ...gym, focus: "muscle", goalKg: 75, daysPerWeek: d })).workouts.splitName;
+    expect(split(3)).toBe("Full body");
+    expect(split(4)).toBe("Upper / lower");
+    expect(split(6)).toBe("Push / pull / legs");
+    // PPL needs 3+ days
+    expect(buildPlan(p({ ...gym, focus: "muscle", goalKg: 75, daysPerWeek: 2, split: "ppl" })).workouts.splitName).toBe("Full body");
+  });
+
+  it("trains every major muscle about twice a week with a reasonable volume", () => {
+    const w = buildPlan(p({ ...gym, focus: "muscle", goalKg: 75, daysPerWeek: 4 })).workouts;
+    expect(w.days.filter((d) => d.type === "strength")).toHaveLength(4);
+    for (const m of ["chest", "back", "quads", "hamstrings", "glutes"]) {
+      const v = w.volume.find((x) => x.muscle === m)!;
+      expect(v.frequency).toBeGreaterThanOrEqual(2);
+      expect(v.sets).toBeGreaterThanOrEqual(8);
+      expect(v.sets).toBeLessThanOrEqual(26);
+    }
+  });
+
+  it("gives priority muscles more sets and puts them first", () => {
+    const base = { ...gym, focus: "muscle" as const, goalKg: 75, daysPerWeek: 4 };
+    const plain = buildPlan(p(base)).workouts.volume;
+    const prio = buildPlan(p({ ...base, priorityMuscles: ["glutes", "shoulders"] })).workouts;
+    const sets = (vol: typeof plain, m: string) => vol.find((v) => v.muscle === m)!.sets;
+    expect(sets(prio.volume, "glutes")).toBeGreaterThan(sets(plain, "glutes"));
+    expect(sets(prio.volume, "shoulders")).toBeGreaterThan(sets(plain, "shoulders"));
+    expect(prio.volume.find((v) => v.muscle === "glutes")!.priority).toBe(true);
+    const lower = prio.days.find((d) => d.title.startsWith("Lower"))!;
+    expect(["Hip thrust", "Romanian deadlift", "Walking lunge", "Barbell back squat"]).toContain(lower.exercises[0].name);
+    for (const d of prio.days) expect(d.exercises.length).toBeLessThanOrEqual(9);
+  });
+
+  it("still respects injuries and equipment in muscle plans", () => {
+    const w = buildPlan(p({ focus: "muscle", goalKg: 75, equipment: "none", injuries: ["knee"], daysPerWeek: 3 })).workouts;
+    const names = w.days.flatMap((d) => d.exercises.map((e) => e.name));
+    expect(names).not.toContain("Wall sit");
+    expect(names).not.toContain("Bodyweight squat");
+    expect(names).not.toContain("Leg extension");
+    expect(names.length).toBeGreaterThan(10);
+  });
+});

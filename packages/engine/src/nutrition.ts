@@ -290,7 +290,21 @@ export function buildNutrition(p: Profile, n: Numbers, variant = 0): NutritionPl
   const foodList = (k: keyof typeof FOODS) => byCuisine(p, FOODS[k].filter((f) => allowed(p, f))).map((f) => f.name);
 
   const goalTips =
-    n.goal === "lose"
+    n.focus === "recomp"
+      ? [
+          "Get protein at every meal: eggs, fish, chicken, beans, tofu or Greek yogurt. It's the most important part of a recomp.",
+          "Put most of your carbs around training (the meal before and after) to fuel hard sets.",
+          "Keep the deficit small. If your lifts are dropping for two weeks in a row, eat about 150 kcal more.",
+          "Check your waist measurement every 2 weeks alongside your weight.",
+        ]
+      : n.focus === "muscle" && !n.weightChangeBlocked
+        ? [
+            "Eat 3–5 meals with protein in each, including one in the 1–2 hours after training.",
+            "Carbs fuel training volume: rice, oats, potatoes, ground provisions and fruit are all good choices.",
+            "Weigh weekly. Gaining more than about 0.5% of your weight a week? Trim 100–200 kcal. Not gaining after 2 weeks? Add 100–200 kcal.",
+            "A smoothie (oats, banana, peanut butter, milk) is an easy way to add calories if you struggle to eat enough.",
+          ]
+        : n.goal === "lose"
       ? [
           "Fill half your plate with vegetables. They add volume for very few calories.",
           "Include protein at every meal. It keeps you fuller and protects muscle.",

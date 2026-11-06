@@ -1,4 +1,20 @@
-import { INJURY_AREAS, INJURY_LABEL, LB_PER_KG, ProfileSchema, type InjuryArea, type Profile, type Units } from "@stride/engine";
+import {
+  FOCUSES,
+  FOCUS_LABEL,
+  INJURY_AREAS,
+  INJURY_LABEL,
+  LB_PER_KG,
+  MAX_PRIORITY_MUSCLES,
+  MUSCLES,
+  MUSCLE_LABEL,
+  ProfileSchema,
+  SPLITS,
+  SPLIT_LABEL,
+  type InjuryArea,
+  type Muscle,
+  type Profile,
+  type Units,
+} from "@stride/engine";
 import { useEffect, useState } from "react";
 
 interface Draft {
@@ -65,6 +81,16 @@ export function ProfileForm({ profile, units, onChange }: { profile: Profile; un
     onChange: (e: React.ChangeEvent<HTMLSelectElement>) => set(k, (numeric ? Number(e.target.value) : e.target.value) as Profile[K]),
   });
   const wUnit = units === "metric" ? "kg" : "lb";
+  const toggleMuscle = (m: Muscle) =>
+    set(
+      "priorityMuscles",
+      profile.priorityMuscles.includes(m)
+        ? profile.priorityMuscles.filter((x) => x !== m)
+        : profile.priorityMuscles.length < MAX_PRIORITY_MUSCLES
+          ? [...profile.priorityMuscles, m]
+          : profile.priorityMuscles,
+    );
+  const muscleFocus = profile.focus !== "general";
   const toggleInjury = (a: InjuryArea) =>
     set("injuries", profile.injuries.includes(a) ? profile.injuries.filter((x) => x !== a) : [...profile.injuries, a]);
 
@@ -123,6 +149,18 @@ export function ProfileForm({ profile, units, onChange }: { profile: Profile; un
         </div>
 
         <div className="sep" />
+        <div className="f full">
+          <label htmlFor="focus">What do you want from training?</label>
+          <select {...sel("focus")}>
+            {FOCUSES.map((f) => (
+              <option key={f} value={f}>
+                {FOCUS_LABEL[f]}
+              </option>
+            ))}
+          </select>
+          {profile.focus === "recomp" && <p className="muted small">Lose fat and build muscle at the same time: a small calorie deficit, high protein and muscle-building workouts.</p>}
+          {profile.focus === "muscle" && <p className="muted small">A small calorie surplus and workouts split by muscle group.</p>}
+        </div>
         <div className="f">
           <label htmlFor="experience">Training experience</label>
           <select {...sel("experience")}>
@@ -147,6 +185,39 @@ export function ProfileForm({ profile, units, onChange }: { profile: Profile; un
             <option value="gym">Full gym</option>
           </select>
         </div>
+
+        {muscleFocus && (
+          <>
+            <div className="f full">
+              <label htmlFor="split">How to split your days</label>
+              <select {...sel("split")}>
+                {SPLITS.map((sp) => (
+                  <option key={sp} value={sp} disabled={sp === "ppl" && profile.daysPerWeek < 3}>
+                    {SPLIT_LABEL[sp]}
+                    {sp === "ppl" && profile.daysPerWeek < 3 ? " (needs 3+ days)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <fieldset className="f full injuries">
+              <legend className="lbl">
+                Muscles to prioritise <span className="muted">(up to {MAX_PRIORITY_MUSCLES})</span>
+              </legend>
+              <div className="chips">
+                {MUSCLES.map((m) => {
+                  const on = profile.priorityMuscles.includes(m);
+                  const full = !on && profile.priorityMuscles.length >= MAX_PRIORITY_MUSCLES;
+                  return (
+                    <label key={m} className="chip" aria-disabled={full || undefined} style={full ? { opacity: 0.5 } : undefined}>
+                      <input type="checkbox" id={`mus-${m}`} checked={on} disabled={full} onChange={() => toggleMuscle(m)} />
+                      {MUSCLE_LABEL[m]}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          </>
+        )}
 
         <fieldset className="f full injuries">
           <legend className="lbl">Injuries or limitations</legend>

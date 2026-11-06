@@ -11,6 +11,41 @@ export const INJURY_LABEL: Record<InjuryArea, string> = {
   ankle: "Ankles / feet",
 };
 
+/** What the user wants their training to do. "general" is the original health-and-fitness plan. */
+export const FOCUSES = ["general", "recomp", "muscle"] as const;
+export type Focus = (typeof FOCUSES)[number];
+export const FOCUS_LABEL: Record<Focus, string> = {
+  general: "General health & fitness",
+  recomp: "Body recomposition (lose fat, build muscle)",
+  muscle: "Build muscle",
+};
+
+/** Muscle groups a user can prioritise. */
+export const MUSCLES = ["chest", "back", "shoulders", "arms", "glutes", "quads", "hamstrings", "calves", "core"] as const;
+export type Muscle = (typeof MUSCLES)[number];
+export const MUSCLE_LABEL: Record<Muscle, string> = {
+  chest: "Chest",
+  back: "Back",
+  shoulders: "Shoulders",
+  arms: "Arms",
+  glutes: "Glutes",
+  quads: "Quads",
+  hamstrings: "Hamstrings",
+  calves: "Calves",
+  core: "Core",
+};
+export const MAX_PRIORITY_MUSCLES = 3;
+
+/** How training days are split up. "auto" picks from days per week and experience. */
+export const SPLITS = ["auto", "full", "upperLower", "ppl"] as const;
+export type Split = (typeof SPLITS)[number];
+export const SPLIT_LABEL: Record<Split, string> = {
+  auto: "Pick for me",
+  full: "Full body every session",
+  upperLower: "Upper / lower",
+  ppl: "Push / pull / legs",
+};
+
 /** Validation schema for a user's profile. Shared by the API (request validation) and the client (form). */
 export const ProfileSchema = z.object({
   sex: z.enum(["female", "male", "other"]),
@@ -39,6 +74,12 @@ export const ProfileSchema = z.object({
   avoidExercises: z.array(z.string().max(60)).max(60).default([]),
   /** Daily step goal for the walking tracker. */
   stepGoal: z.number().int().min(1000).max(30000).default(8000),
+  /** Training focus. Older saved profiles default to "general". */
+  focus: z.enum(FOCUSES).default("general"),
+  /** Up to three muscle groups to train first and give extra sets. */
+  priorityMuscles: z.array(z.enum(MUSCLES)).max(MAX_PRIORITY_MUSCLES).default([]),
+  /** Preferred split for muscle-focused plans. */
+  split: z.enum(SPLITS).default("auto"),
 });
 
 export type Profile = z.infer<typeof ProfileSchema>;
@@ -75,6 +116,9 @@ export const DEFAULT_PROFILE: Profile = {
   lowImpact: false,
   avoidExercises: [],
   stepGoal: 8000,
+  focus: "general",
+  priorityMuscles: [],
+  split: "auto",
 };
 
 export const LB_PER_KG = 2.20462;

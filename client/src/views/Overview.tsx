@@ -14,8 +14,17 @@ const SEGMENTS: [number, number, string][] = [
 
 export function Overview({ plan, profile, units }: { plan: Plan; profile: Profile; units: Units }) {
   const n = plan.numbers;
-  const title = { lose: "Lose weight", gain: "Gain weight", maintain: "Maintain & build fitness" }[n.goal];
+  const title =
+    n.focus === "recomp" ? "Body recomposition" : n.focus === "muscle" ? "Build muscle" : { lose: "Lose weight", gain: "Gain weight", maintain: "Maintain & build fitness" }[n.goal];
   const sub = n.weightChangeBlocked
+    ? "Targets are set for maintenance and strength, not weight change."
+    : n.focus === "recomp"
+      ? n.targetKcal && n.targetKcal < n.tdee - 20
+        ? `A small deficit (about ${fw(n.ratePerWeekKg, units)} a week) with high protein, so you lose fat while building muscle. Track your waist and your lifts, not just the scale.`
+        : "You're already lean, so calories stay near maintenance. High protein and hard training shift your body toward more muscle and less fat."
+      : n.focus === "muscle"
+        ? `A small surplus (about ${fw(n.ratePerWeekKg, units)} a week) to build muscle while keeping fat gain low.`
+        : n.weightChangeBlocked
     ? "Targets are set for maintenance and strength, not weight change."
     : n.goal === "maintain"
       ? "Your goal is close to your current weight, so the plan focuses on strength and fitness."
@@ -30,7 +39,7 @@ export function Overview({ plan, profile, units }: { plan: Plan; profile: Profil
       <Heading title={title} sub={sub} />
       <div className="stats">
         <Stat k="Daily calories" v={n.targetKcal ? kcal(n.targetKcal) : "—"} unit="kcal" s={`Maintenance ≈ ${kcal(Math.round(n.tdee / 10) * 10)}`} />
-        <Stat k="Protein" v={n.numbersHidden ? "—" : `${n.proteinG[0]}–${n.proteinG[1]}`} unit="g/day" s={`1.6–${n.goal === "lose" ? "2.2" : "2.0"} g per kg`} />
+        <Stat k="Protein" v={n.numbersHidden ? "—" : `${n.proteinG[0]}–${n.proteinG[1]}`} unit="g/day" s={`${n.proteinPerKg[0].toFixed(1)}–${n.proteinPerKg[1].toFixed(1)} g per kg`} />
         <Stat k="Time to goal" v={n.weeksToGoal ? `${n.weeksToGoal} wk` : "—"} s={n.weeksToGoal ? "If you stay consistent" : "No weight change planned"} />
         <Stat k="Water" v={units === "metric" ? n.waterL : Math.round(n.waterL * 33.8)} unit={units === "metric" ? "L" : "fl oz"} s="More in heat or long sessions" />
       </div>

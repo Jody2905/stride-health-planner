@@ -37,9 +37,24 @@ export function Workouts({
     <section className="view">
       <Banners flags={plan.numbers.flags} only={["stop"]} />
       <Heading
-        title={`Your week · ${daysPerWeek} training days`}
+        title={`Your week · ${daysPerWeek} training days${w.splitName ? ` · ${w.splitName}` : ""}`}
         sub={`Sets × reps are on the right. Tap an exercise to see how to do it, or ↻ to swap it for another. Rest ${w.restBetweenSets} between sets. Aim for ${w.weeklyCardioMinutes} minutes of moderate cardio across the week.`}
       />
+      {w.focusNotes.length > 0 && (
+        <div className="banner info">
+          <span className="ic" aria-hidden>
+            i
+          </span>
+          <div>
+            <b>{w.focus === "recomp" ? "Body recomposition" : "Building muscle"}</b>
+            <ul className="tight">
+              {w.focusNotes.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
       {w.injuryNotes.length > 0 && (
         <div className="banner info">
           <span className="ic" aria-hidden>
@@ -110,6 +125,42 @@ export function Workouts({
           );
         })}
       </div>
+      {w.volume.length > 0 && (
+        <div className="volume">
+          <h4>Weekly sets per muscle</h4>
+          <p className="muted small">Hard sets per week (indirect work counts as half). About 10–20 a week, spread over 2 sessions, is the research-backed range for growth.</p>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Muscle</th>
+                <th scope="col">Sets / week</th>
+                <th scope="col">Sessions</th>
+                <th scope="col">
+                  <span className="sr">Status</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {w.volume.map((v) => (
+                <tr key={v.muscle} className={v.priority ? "prio" : undefined}>
+                  <th scope="row">
+                    {v.label}
+                    {v.priority && <span className="pill">priority</span>}
+                  </th>
+                  <td>
+                    <span className="vbar" aria-hidden>
+                      <i style={{ width: `${Math.min(100, (v.sets / 24) * 100)}%` }} className={v.status} />
+                    </span>
+                    {v.sets}
+                  </td>
+                  <td>{v.frequency}×</td>
+                  <td className={`vs ${v.status}`}>{v.status === "low" ? "Light" : v.status === "high" ? "Very high" : "In range"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <div className="cols">
         <Box title="Before every session" items={w.beforeSession} />
         <Box title="How to progress" items={w.progression} />

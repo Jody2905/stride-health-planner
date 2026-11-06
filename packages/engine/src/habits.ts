@@ -40,5 +40,10 @@ export const SOURCES = [
   { title: "USPSTF: vitamin supplementation to prevent heart disease and cancer (2022)", url: "https://www.uspreventiveservicestaskforce.org/uspstf/recommendation/vitamin-supplementation-to-prevent-cvd-and-cancer-preventive-medication", usedFor: "Multivitamin evidence" },
   { title: "WHO healthy diet fact sheet", url: "https://www.who.int/news-room/fact-sheets/detail/healthy-diet", usedFor: "Fruit & veg, sugar, salt" },
   { title: "IARC: carcinogenicity of red and processed meat (2015)", url: "https://www.iarc.who.int/wp-content/uploads/2018/07/pr240_E.pdf", usedFor: "Limiting processed meat" },
+  { title: "Schoenfeld, Ogborn & Krieger, 2017: weekly training volume and muscle growth (meta-analysis)", url: "https://doi.org/10.1080/02640414.2016.1210197", usedFor: "Weekly sets per muscle (about 10–20) and the volume check" },
+  { title: "Schoenfeld, Ogborn & Krieger, 2016: training frequency and muscle growth (meta-analysis)", url: "https://pubmed.ncbi.nlm.nih.gov/27102172/", usedFor: "Training each muscle about twice a week" },
+  { title: "Barakat et al., 2020: body recomposition in trained individuals", url: "https://doi.org/10.1519/SSC.0000000000000584", usedFor: "Recomp calories, high protein and who recomp suits" },
+  { title: "Iraki et al., 2019: nutrition for building muscle (off-season bodybuilding)", url: "https://pubmed.ncbi.nlm.nih.gov/31247944/", usedFor: "Lean-gain surplus, 0.25–0.5% weight gain per week, protein 1.6–2.2 g/kg" },
+  { title: "Morton et al., 2018: protein supplementation and muscle gains (meta-analysis)", url: "https://pubmed.ncbi.nlm.nih.gov/28698222/", usedFor: "Protein for muscle gain" },
   { title: "Paluch et al., 2022, Lancet Public Health: daily steps and mortality", url: "https://pubmed.ncbi.nlm.nih.gov/35247352/", usedFor: "Step targets" },
 ];

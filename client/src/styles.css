@@ -303,3 +303,20 @@ table.mealplan tbody th { font: 500 12.5px var(--mono); color: var(--muted); wid
 .people li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
 .people li:first-child { border-top: 0; }
 .okmsg { color: var(--accent); font-weight: 700; font-size: 13px; margin: 8px 0 0; }
+
+/* Weekly volume table (muscle-focused plans) */
+.volume { margin: 20px 0; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.volume h4 { margin: 0 0 4px; }
+.volume table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+.volume th, .volume td { text-align: left; padding: 7px 6px; border-top: 1px solid var(--line); }
+.volume thead th { border-top: 0; font-size: 12px; color: var(--muted); font-weight: 600; }
+.volume tbody th { font-weight: 500; white-space: nowrap; }
+.volume .pill { margin-left: 6px; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.volume .vbar { display: inline-block; width: 90px; height: 6px; border-radius: 6px; background: var(--line); margin-right: 8px; vertical-align: middle; overflow: hidden; }
+.volume .vbar i { display: block; height: 100%; background: var(--accent); }
+.volume .vbar i.low { background: var(--amber); }
+.volume .vbar i.high { background: var(--red); }
+.volume .vs { font-size: 12px; color: var(--muted); }
+.volume .vs.low { color: var(--amber); }
+.volume .vs.high { color: var(--red); }
+@media (max-width: 520px) { .volume .vbar { width: 50px; } }

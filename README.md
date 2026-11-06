@@ -5,6 +5,10 @@
 A full-stack TypeScript app that builds a personalised plan from a user's age, height, weight, goal weight, activity level and preferences:
 
 - **Calorie, protein and water targets** (Mifflin-St Jeor BMR × activity factor, safe deficit/surplus with hard floors)
+- **Training focus**: general fitness, **body recomposition** (lose fat and build muscle at the same time) or **build muscle**. Recomp uses a small deficit scaled to body fat and 2.0–2.4 g/kg protein; muscle building uses a lean 5–10% surplus. Conflicting choices are handled safely (e.g. "build muscle" with a lower goal weight becomes a recomp)
+- **Muscle-group splits**: full body, upper / lower, or push / pull / legs (picked from your days per week, or choose one), training each muscle about twice a week with hypertrophy rep ranges
+- **Priority muscles**: pick up to 3 (chest, back, shoulders, arms, glutes, quads, hamstrings, calves, core); they're trained early in each session and get an extra exercise or set
+- **Weekly volume check**: hard sets per muscle per week against the research-backed 10–20 set range
 - **Weekly workout plan** for 2–6 days, matched to experience level and equipment (none / dumbbells / gym), with how-to steps for every exercise
 - **Injury-aware training**: mark knees, lower back, shoulders, wrists, hips or ankles and exercises that load them are replaced with safer alternatives; swap out any exercise you don't want with one tap; low-impact cardio option
 - **Nutrition**: macro split, meal-by-meal targets in hand portions, sample days for omnivore / vegetarian / vegan diets, dairy-free and gluten-free filters, and a Caribbean food option
@@ -23,7 +27,7 @@ Safety rules are built into the engine: no weight-loss plan for under-18s, pregn
 | Health engine | Pure TypeScript package (`packages/engine`), Zod schema, Vitest |
 | API | Node + Express, PostgreSQL (Neon in production, PGlite locally: a real Postgres that runs inside Node, nothing to install), JWT sessions in httpOnly cookies |
 | Client | React 18 + Vite |
-| Tests | 24 engine unit tests, 16 API integration tests (Supertest) |
+| Tests | 35 engine unit tests, 16 API integration tests (Supertest) |
 
 ```
 packages/engine   calculations, workouts, nutrition, groceries, supplements, habits (shared by API and client)

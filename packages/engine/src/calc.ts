@@ -1,4 +1,4 @@
-import { Flag, Goal, Profile, Units, formatWeight } from "./types";
+import { Flag, Focus, Goal, Profile, Units, formatWeight } from "./types";
 
 export const ACTIVITY_FACTOR: Record<Profile["activity"], number> = {
   sedentary: 1.2,
@@ -35,6 +35,10 @@ export interface Numbers {
   ratePerWeekKg: number;
   weeksToGoal: number;
   proteinG: [number, number];
+  /** Protein range per kg of reference body weight used for proteinG. */
+  proteinPerKg: [number, number];
+  /** Training focus actually used (may differ from the profile, e.g. "muscle" becomes "recomp" when weight loss is the goal). */
+  focus: Focus;
   waterL: number;
   /** True when weight change is switched off for safety reasons. */
   weightChangeBlocked: boolean;
@@ -122,18 +126,57 @@ export function calculate(p: Profile, units: Units = "metric"): Numbers {
     });
   }
 
-  let target = tdee;
-  if (!blocked && goal === "lose") {
-    const deficit = Math.min(550, tdee * 0.2);
-    target = Math.max(tdee - deficit, calorieFloor(p.sex));
+  // Training focus. Building muscle while the stated goal is weight loss is a recomposition.
+  let focus: Focus = p.focus;
+  if (pregnant && focus !== "general") {
+    focus = "general";
+    flags.push({
+      level: "info",
+      title: "Muscle-building plan paused",
+      message: "During pregnancy and breastfeeding Stride uses the general plan. Your midwife or doctor can tell you which strength work is right for you.",
+    });
+  } else if (focus === "muscle" && goal === "lose") {
+    focus = "recomp";
+    flags.push({
+      level: "info",
+      title: "Planned as body recomposition",
+      message: "Your goal weight is lower than your current weight, so Stride uses a small deficit with high protein and hypertrophy training: you lose fat while building muscle.",
+    });
+  } else if (focus === "muscle" && bmi >= 27 && !blocked) {
+    focus = "recomp";
+    flags.push({
+      level: "info",
+      title: "Recomposition first",
+      message: "At your current weight, building muscle in a small deficit works well and avoids gaining extra fat. Switch to a surplus later if progress stalls.",
+    });
   }
-  if (!blocked && goal === "gain") target = tdee + 275;
-  const rate = blocked || goal === "maintain" ? 0 : (Math.abs(target - tdee) * 7) / KCAL_PER_KG;
-  const weeksToGoal = rate > 0 ? Math.ceil(Math.abs(effectiveGoalKg - p.weightKg) / rate) : 0;
+
+  let target = tdee;
+  if (!blocked && focus === "recomp") {
+    // Bigger deficits for more body fat, close to maintenance for lean people (Barakat et al., 2020).
+    const deficit = goal === "gain" ? 0 : bmi >= 25 ? Math.min(500, tdee * 0.15) : bmi >= 21 ? Math.min(300, tdee * 0.1) : 0;
+    target = Math.max(tdee - deficit, calorieFloor(p.sex));
+    if (target < tdee && goal !== "lose") goal = "lose";
+  } else if (!blocked && focus === "muscle") {
+    // Lean gain: ~10% surplus for beginners/intermediates, ~5% for advanced (Iraki et al., 2019).
+    const pct = p.experience === "advanced" ? 0.05 : 0.1;
+    target = tdee + Math.min(350, Math.max(150, tdee * pct));
+    goal = "gain";
+  } else {
+    if (!blocked && goal === "lose") {
+      const deficit = Math.min(550, tdee * 0.2);
+      target = Math.max(tdee - deficit, calorieFloor(p.sex));
+    }
+    if (!blocked && goal === "gain") target = tdee + 275;
+  }
+  const rate = blocked || target === tdee ? 0 : (Math.abs(target - tdee) * 7) / KCAL_PER_KG;
+  const towardGoal = (goal === "lose" && effectiveGoalKg < p.weightKg) || (goal === "gain" && effectiveGoalKg > p.weightKg);
+  const weeksToGoal = rate > 0 && towardGoal ? Math.ceil(Math.abs(effectiveGoalKg - p.weightKg) / rate) : 0;
 
   // Protein is based on a reference weight capped at BMI 25 so it isn't inflated by body fat.
   const refKg = Math.min(p.weightKg, 25 * h * h);
-  const proteinG: [number, number] = [Math.round(1.6 * refKg), Math.round((goal === "lose" ? 2.2 : 2.0) * refKg)];
+  const proteinPerKg: [number, number] = focus === "recomp" ? [2.0, 2.4] : focus === "muscle" ? [1.6, 2.2] : [1.6, goal === "lose" ? 2.2 : 2.0];
+  const proteinG: [number, number] = [Math.round(proteinPerKg[0] * refKg), Math.round(proteinPerKg[1] * refKg)];
 
   return {
     bmi,
@@ -148,6 +191,8 @@ export function calculate(p: Profile, units: Units = "metric"): Numbers {
     ratePerWeekKg: rate,
     weeksToGoal,
     proteinG,
+    proteinPerKg,
+    focus,
     waterL: Math.round(p.weightKg * 0.035 * 10) / 10,
     weightChangeBlocked: blocked,
     numbersHidden: hidden,
